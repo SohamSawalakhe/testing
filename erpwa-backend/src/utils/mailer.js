@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 
 export async function sendMail({ to, subject, text, html }) {
   await transporter.sendMail({
-    from: `"WhatsApp ERP" <${process.env.SMTP_FROM}>`,
+    from: `${process.env.SMTP_FROM}`,
     to,
     subject,
     text,
