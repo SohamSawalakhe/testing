@@ -1,18 +1,26 @@
 import prisma from "../prisma.js";
-import { sendWhatsAppImage } from "../services/whatsapp.service.js";
+import { sendWhatsAppImage } from "../services/whatsappCampaign.service.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const MAX_RETRIES = 1;
 
 export async function processImageQueue() {
+  console.log("🟢 Image worker running");
+
   while (true) {
     const message = await prisma.message.findFirst({
       where: {
         status: "queued",
         messageType: "image",
+        retryCount: { lt: MAX_RETRIES },
       },
       orderBy: { createdAt: "asc" },
       include: {
-        conversation: { include: { lead: true } },
+        vendor: true,
+        conversation: {
+          include: { lead: true },
+        },
+        media: true,
       },
     });
 
@@ -28,16 +36,13 @@ export async function processImageQueue() {
     });
 
     try {
-      const media = await prisma.messageMedia.findFirst({
-        where: { messageId: message.id },
-      });
-
-      if (!media) {
-        throw new Error("Media not found");
-      }
+      const media = message.media?.[0];
+      if (!media) throw new Error("Media not found");
 
       await sendWhatsAppImage({
-        to: message.conversation.lead.phone,
+        phoneNumberId: message.vendor.whatsappPhoneNumberId,
+        accessToken: message.vendor.whatsappAccessToken,
+        to: message.conversation.lead.phoneNumber,
         imageUrl: media.mediaUrl,
         caption: media.caption,
       });
@@ -52,16 +57,23 @@ export async function processImageQueue() {
         data: { status: "sent" },
       });
 
-      await sleep(1000); // WhatsApp-safe
+      console.log("✅ Sent image:", message.id);
+      await sleep(1000);
     } catch (err) {
-      console.error("WhatsApp send failed:", err.message);
+      console.error("❌ WhatsApp send failed:", err.message);
+
+      const retries = message.retryCount + 1;
 
       await prisma.message.update({
         where: { id: message.id },
-        data: { status: "queued" }, // retry later
+        data: {
+          retryCount: retries,
+          status: retries >= MAX_RETRIES ? "failed" : "queued",
+          errorCode: err.message,
+        },
       });
 
-      await sleep(5000);
+      await sleep(3000);
     }
   }
 }
