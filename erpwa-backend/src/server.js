@@ -24,6 +24,7 @@ import { initSocket } from "./socket.js";
 import userRoutes from "./routes/user.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import testUploadRoute from "./routes/testUpload.route.js";
+import WhatsappNumberCheckRoute from "./routes/whatsappNumberCheck.route.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -64,6 +65,7 @@ app.use("/api/campaign", campaignRoutes);
 app.use("/api/recipients", recipientRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
 app.use("/test", testUploadRoute);
+app.use("/api/whatsapp", WhatsappNumberCheckRoute);
 
 /* ================= SERVER START ================= */
 const PORT = process.env.PORT || 5000;
