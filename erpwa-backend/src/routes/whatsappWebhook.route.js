@@ -23,7 +23,12 @@ async function logWebhookEvent({
   processingMs,
 }) {
   try {
-    console.log("📝 Logging webhook event:", { vendorId, eventType, status, phoneNumber });
+    console.log("📝 Logging webhook event:", {
+      vendorId,
+      eventType,
+      status,
+      phoneNumber,
+    });
 
     const log = await prisma.webhookLog.create({
       data: {
@@ -58,7 +63,7 @@ async function logWebhookEvent({
         processingMs: log.processingMs,
         createdAt: log.createdAt.toISOString(),
       });
-    } catch { }
+    } catch {}
   } catch (err) {
     console.error("❌ Failed to log webhook event:", err.message);
     // Never throw - logging should not break webhook
@@ -196,14 +201,19 @@ router.post("/", async (req, res) => {
       for (const msg of value.messages) {
         phoneNumber = msg.from;
         messageId = msg.id;
-        console.log("📨 Processing message from:", phoneNumber, "type:", msg.type);
+        console.log(
+          "📨 Processing message from:",
+          phoneNumber,
+          "type:",
+          msg.type,
+        );
 
         // ✅ WhatsApp message timestamp (seconds → ms)
         const inboundAt = new Date(Number(msg.timestamp) * 1000);
 
         // ✅ 24 hour window from LAST inbound message
         const sessionExpiresAt = new Date(
-          inboundAt.getTime() + 24 * 60 * 60 * 1000
+          inboundAt.getTime() + 24 * 60 * 60 * 1000,
         );
 
         const whatsappMessageId = msg.id;
@@ -315,7 +325,7 @@ router.post("/", async (req, res) => {
 
             const { buffer, mimeType, fileName } = await downloadWhatsappMedia(
               mediaId,
-              accessToken
+              accessToken,
             );
 
             const extension =
@@ -354,9 +364,9 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch { }
+        } catch {}
 
-        /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
+        /* 🔥 EMIT REAL-TIME MESSAGE UPDATE */
         try {
           const io = getIO();
           const fullMessage = await prisma.message.findUnique({
@@ -364,26 +374,38 @@ router.post("/", async (req, res) => {
             include: { media: true },
           });
 
-          console.log("📤 Emitting message:new to conversation:", conversation.id);
-          console.log("📤 Message data:", {
-            id: fullMessage.id,
-            sender: "customer",
-            text: fullMessage.media.length ? undefined : fullMessage.content,
-          });
+          console.log(
+            "📤 Emitting message:new to conversation:",
+            conversation.id,
+          );
 
-          io.to(`conversation:${conversation.id}`).emit("message:new", {
+          // Build properly structured message for frontend
+          const socketMessage = {
             id: fullMessage.id,
             whatsappMessageId: fullMessage.whatsappMessageId,
+            replyToMessageId: fullMessage.replyToMessageId,
             sender: "customer",
             timestamp: fullMessage.createdAt.toISOString(),
-            replyToMessageId: fullMessage.replyToMessageId,
+            status: fullMessage.status,
+          };
 
-            text: fullMessage.media.length ? undefined : fullMessage.content,
+          // Add text or media fields based on message type
+          if (fullMessage.media && fullMessage.media.length > 0) {
+            socketMessage.mediaUrl = fullMessage.media[0].mediaUrl;
+            socketMessage.mimeType = fullMessage.media[0].mimeType;
+            if (fullMessage.media[0].caption) {
+              socketMessage.caption = fullMessage.media[0].caption;
+            }
+          } else {
+            socketMessage.text = fullMessage.content;
+          }
 
-            mediaUrl: fullMessage.media[0]?.mediaUrl,
-            mimeType: fullMessage.media[0]?.mimeType,
-            caption: fullMessage.media[0]?.caption,
-          });
+          console.log("📤 Message data:", socketMessage);
+
+          io.to(`conversation:${conversation.id}`).emit(
+            "message:new",
+            socketMessage,
+          );
           console.log("✅ Socket emit successful");
         } catch (socketErr) {
           console.error("❌ Socket emit failed:", socketErr.message);
@@ -490,9 +512,9 @@ router.post("/", async (req, res) => {
             {
               whatsappMessageId,
               status: waState,
-            }
+            },
           );
-        } catch { }
+        } catch {}
 
         // Log successful status update
         await logWebhookEvent({

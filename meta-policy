@@ -1,0 +1,4 @@
+Confirm advanced access for public_profile
+The public_profile permission allows apps to read the Default Public Profile Fields on a User node. The allowed usage for this permission is to authenticate app users and provide them with a personalized in-app experience. This permission is automatically granted to all apps. You may also use this permission to request analytics insights to improve your app and for marketing or advertising purposes, through the use of aggregated and de-identified or anonymized information (provided such data cannot be re-identified).
+
+I agree that any data I receive through public_profile will be used in accordance with the allowed usage.

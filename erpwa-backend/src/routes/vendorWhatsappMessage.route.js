@@ -145,10 +145,10 @@ router.post(
           text: { body: text },
           ...(replyToMessageId
             ? {
-              context: {
-                message_id: replyToMessageId,
-              },
-            }
+                context: {
+                  message_id: replyToMessageId,
+                },
+              }
             : {}),
         }),
       },

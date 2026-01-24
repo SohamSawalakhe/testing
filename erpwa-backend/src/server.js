@@ -6,6 +6,7 @@ import http from "http";
 import "./cron/templateStatus.cron.js";
 import prisma from "./prisma.js";
 import { processWhatsappQueue } from "./workers/whatsapp.worker.js";
+
 import authRoutes from "./routes/auth.routes.js";
 import vendorWhatsappRoutes from "./routes/vendorWhatsapp.route.js";
 import vendorWhatsappMessageRoutes from "./routes/vendorWhatsappMessage.route.js";
@@ -28,8 +29,21 @@ import WhatsappNumberCheckRoute from "./routes/whatsappNumberCheck.route.js";
 import webhookLogsRoutes from "./routes/webhookLogs.route.js";
 
 const app = express();
+
+/* ================= CORE HARDENING ================= */
 app.set("trust proxy", 1);
-/* ================= MIDDLEWARE ================= */
+app.disable("x-powered-by");
+
+/* ==================================================
+   🔴 WHATSAPP WEBHOOK (RAW BODY — MUST BE FIRST)
+   ================================================== */
+app.use(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  whatsappWebhookRoutes,
+);
+
+/* ================= STANDARD MIDDLEWARE ================= */
 app.use(express.json());
 app.use(cookieParser());
 
@@ -41,14 +55,20 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-  })
+  }),
 );
 
 app.set("etag", false);
 
-/* ================= ROUTES ================= */
-app.get("/ping", (req, res) => res.send("pong"));
+/* ================= HEALTH ================= */
+app.get("/ping", (_, res) => res.send("pong"));
 
+app.get("/health", async (_, res) => {
+  await prisma.$queryRaw`SELECT 1`;
+  res.json({ status: "ok" });
+});
+
+/* ================= ROUTES ================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/whatsapp-test", whatsappTestRoutes);
@@ -65,9 +85,17 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/campaign", campaignRoutes);
 app.use("/api/recipients", recipientRoutes);
 app.use("/api/webhook-logs", webhookLogsRoutes);
-app.use("/webhook", whatsappWebhookRoutes);
 app.use("/test", testUploadRoute);
 app.use("/api/whatsapp", WhatsappNumberCheckRoute);
+
+/* ================= GLOBAL ERROR HANDLER ================= */
+app.use((err, req, res, next) => {
+  console.error("❌ Unhandled error:", err);
+
+  res.status(err.status || 500).json({
+    message: "Internal server error",
+  });
+});
 
 /* ================= SERVER START ================= */
 const PORT = process.env.PORT || 5000;
@@ -77,11 +105,10 @@ async function startServer() {
     await prisma.$queryRaw`SELECT 1`;
     console.log("✅ Database connected successfully");
   } catch (error) {
-    console.error("❌ Database connection failed");
-    console.error(error);
+    console.error("❌ Database connection failed", error);
+    process.exit(1);
   }
 
-  // Start WhatsApp campaign workers
   // Start WhatsApp campaign worker
   processWhatsappQueue().catch((err) => {
     console.error("❌ WhatsApp worker crashed:", err);

@@ -37,7 +37,7 @@ export function useInboxSocket({
               return { ...conv, unreadCount: 0, hasUnread: false };
             }
             return conv;
-          })
+          }),
         );
       } catch (err) {
         console.error("Inbox refresh failed", err);
