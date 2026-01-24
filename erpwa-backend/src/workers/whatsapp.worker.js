@@ -16,7 +16,7 @@ function log(level, message, meta = {}) {
       level,
       message,
       ...meta,
-    }),
+    })
   );
 }
 
@@ -68,19 +68,9 @@ export async function processWhatsappQueue() {
 
       // 4️⃣ Dispatch based on message type
       if (message.messageType === "image") {
-        whatsappMsgId = await processImageMessage(
-          message,
-          accessToken,
-          to,
-          vendor,
-        );
+        whatsappMsgId = await processImageMessage(message, accessToken, to, vendor);
       } else if (message.messageType === "template") {
-        whatsappMsgId = await processTemplateMessage(
-          message,
-          accessToken,
-          to,
-          vendor,
-        );
+        whatsappMsgId = await processTemplateMessage(message, accessToken, to, vendor);
       } else {
         throw new Error(`Unsupported message type: ${message.messageType}`);
       }
@@ -211,7 +201,7 @@ async function processImageMessage(message, accessToken, to, vendor) {
 
 async function processTemplateMessage(message, accessToken, to, vendor) {
   const { outboundPayload } = message;
-
+  
   if (!outboundPayload || !outboundPayload.templateId) {
     throw new Error("Missing template payload");
   }
@@ -254,10 +244,7 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
   }
 
   // B. Body
-  if (
-    outboundPayload.bodyVariables &&
-    outboundPayload.bodyVariables.length > 0
-  ) {
+  if (outboundPayload.bodyVariables && outboundPayload.bodyVariables.length > 0) {
     components.push({
       type: "body",
       parameters: outboundPayload.bodyVariables.map((v) => ({

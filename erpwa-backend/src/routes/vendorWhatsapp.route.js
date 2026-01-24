@@ -8,6 +8,7 @@ import { encrypt } from "../utils/encryption.js";
 
 const router = express.Router();
 
+
 console.log("✅ vendorWhatsapp routes loaded");
 
 /**
@@ -39,7 +40,7 @@ router.post(
         headers: {
           Authorization: `Bearer ${whatsappAccessToken}`,
         },
-      },
+      }
     );
 
     if (!metaResp.ok) {
@@ -69,7 +70,7 @@ router.post(
     res.json({
       message: "WhatsApp successfully connected",
     });
-  }),
+  })
 );
 
 /**
@@ -95,7 +96,7 @@ router.get(
     });
 
     res.json(vendor);
-  }),
+  })
 );
 
 export default router;

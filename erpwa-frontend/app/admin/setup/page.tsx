@@ -63,7 +63,7 @@ export default function WhatsAppSetupPage() {
           </div>
         </div>
       ),
-      { autoClose: false, closeOnClick: false },
+      { autoClose: false, closeOnClick: false }
     );
   }
 
