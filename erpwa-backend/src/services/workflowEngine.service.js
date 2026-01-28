@@ -258,24 +258,80 @@ async function processNode(session, nodeId, nodes, edges, vendorId) {
         break;
 
       case "button":
-        // Send Interactive Button Message
-        const buttons = (node.data.buttons || []).map((b, i) => ({
-          type: "reply",
-          reply: {
-            id: `btn_${i}`, // ID doesn't matter much for our logic, we match by text
-            title: b.text.substring(0, 20), // Max 20 chars
-          },
-        }));
+        // ANALYZE BUTTON TYPES
+        const buttonsData = node.data.buttons || [];
+        // Support SINGLE CTA button (URL or Phone)
+        if (buttonsData.length === 1) {
+          const btn = buttonsData[0];
 
-        await sendMessage(vendorId, session.conversationId, {
-          type: "interactive",
-          interactive: {
-            type: "button",
-            body: { text: node.data.label || "Please select:" },
-            action: { buttons },
-          },
+          if (btn.type === "url" || btn.type === "phone_number") {
+            const isPhone = btn.type === "phone_number";
+            const urlValue = isPhone ? `tel:${btn.value}` : btn.value;
+            const label = btn.text.substring(0, 20);
+
+            try {
+              await sendMessage(vendorId, session.conversationId, {
+                type: "interactive",
+                interactive: {
+                  type: "cta_url",
+                  body: { text: node.data.label || "Click below:" },
+                  action: {
+                    name: "cta_url",
+                    parameters: {
+                      display_text: label,
+                      url: urlValue,
+                    },
+                  },
+                },
+              });
+              await advanceToNextNode(session, node, edges, nodes, vendorId);
+              return; // Done
+            } catch (e) {
+              console.error("Failed to send native CTA, will fallback", e);
+            }
+          }
+        }
+
+        // STRATEGY 2: FALLBACK / MIXED MODE logic (unchanged essentially, but simplified flow)
+        // ... (rest of the mixed logic remains to handle multiple buttons or errors)
+
+        let bodyText = node.data.label || "Please select:";
+        const validReplyButtons = [];
+
+        buttonsData.forEach((b, i) => {
+          if (b.type === "url") {
+            bodyText += `\n\n🔗 ${b.text}: ${b.value}`;
+          } else if (b.type === "phone_number") {
+            // If we are here, it means we couldn't send it as a single CTA button (maybe mixed with others?)
+            bodyText += `\n\n📞 ${b.text}: ${b.value}`;
+          } else {
+            validReplyButtons.push({
+              type: "reply",
+              reply: {
+                id: `btn_${i}`,
+                title: b.text.substring(0, 20),
+              },
+            });
+          }
         });
-        // STOP here. Wait for user reply.
+
+        // 3. Send Mixed/Fallback
+        if (validReplyButtons.length > 0) {
+          await sendMessage(vendorId, session.conversationId, {
+            type: "interactive",
+            interactive: {
+              type: "button",
+              body: { text: bodyText },
+              action: { buttons: validReplyButtons },
+            },
+          });
+        } else {
+          await sendMessage(vendorId, session.conversationId, {
+            type: "text",
+            text: bodyText,
+          });
+          await advanceToNextNode(session, node, edges, nodes, vendorId);
+        }
         break;
 
       case "list":

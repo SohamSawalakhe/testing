@@ -23,14 +23,14 @@ const StartNode = ({ id, data, selected }: NodeProps) => {
 
   return (
     <div
-      className={`relative shadow-xl rounded-xl bg-white border-2 transition-all duration-200 min-w-[200px] overflow-hidden ${
+      className={`relative shadow-xl rounded-xl bg-white border-2 transition-all duration-200 min-w-[200px] ${
         selected
           ? "border-purple-500 ring-4 ring-purple-500/10"
           : "border-gray-100"
       }`}
     >
       {/* Node Header */}
-      <div className="bg-gray-50/80 px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+      <div className="bg-gray-50/80 px-3 py-2 border-b border-gray-100 flex items-center justify-between rounded-t-xl">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-purple-500 flex items-center justify-center text-white">
             <Rocket size={12} />

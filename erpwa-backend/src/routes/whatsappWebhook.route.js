@@ -454,6 +454,7 @@ router.post("/", async (req, res) => {
             content = interactive.list_reply.title;
           } else if (interactive.type === "button_reply") {
             content = interactive.button_reply.title;
+            // Also store ID if needed, but 'content' helps with workflow matching
           } else {
             content = "[interactive]";
           }

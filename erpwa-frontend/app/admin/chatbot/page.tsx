@@ -18,15 +18,15 @@ import { Save, FolderOpen } from "lucide-react";
 import api from "@/lib/api";
 
 // Components
-import Sidebar from "./_components/Sidebar";
-import MessageNode from "./_components/nodes/MessageNode";
-import ButtonNode from "./_components/nodes/ButtonNode";
-import ListNode from "./_components/nodes/ListNode";
-import ImageNode from "./_components/nodes/ImageNode";
-import GalleryNode from "./_components/nodes/GalleryNode";
-import StartNode from "./_components/nodes/StartNode";
-import ButtonEdge from "./_components/edges/ButtonEdge";
-import WorkflowListModal from "./_components/WorkflowListModal";
+import Sidebar from "../../../components/chatbot/Sidebar";
+import MessageNode from "../../../components/chatbot/nodes/MessageNode";
+import ButtonNode from "../../../components/chatbot/nodes/ButtonNode";
+import ListNode from "../../../components/chatbot/nodes/ListNode";
+import ImageNode from "../../../components/chatbot/nodes/ImageNode";
+import GalleryNode from "../../../components/chatbot/nodes/GalleryNode";
+import StartNode from "../../../components/chatbot/nodes/StartNode";
+import ButtonEdge from "../../../components/chatbot/edges/ButtonEdge";
+import WorkflowListModal from "../../../components/chatbot/WorkflowListModal";
 
 // Helper for ID generation
 const generateId = () => `node_${Math.random().toString(36).substr(2, 9)}`;
@@ -172,6 +172,11 @@ function FlowBuilderContent() {
           onDrop={onDrop}
           onDragOver={onDragOver}
           fitView
+          defaultEdgeOptions={{
+            type: "button",
+            animated: true,
+            style: { strokeWidth: 2, stroke: "#94a3b8" },
+          }}
         >
           <Background color="#aaa" gap={16} />
           <Controls />

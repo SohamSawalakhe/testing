@@ -9,6 +9,8 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
+import Image from "next/image";
+import ReactDOM from "react-dom";
 import { galleryAPI } from "@/lib/galleryApi";
 import api from "@/lib/api";
 
@@ -32,7 +34,10 @@ export default function GalleryModal({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     if (isOpen) {
       fetchImages();
       setSelectedUrls([]);
@@ -43,7 +48,6 @@ export default function GalleryModal({
     try {
       setLoading(true);
       const res = await galleryAPI.list();
-      // @ts-ignore
       setImages(res.data?.images || []);
     } catch (error) {
       console.error("Failed to fetch images", error);
@@ -89,15 +93,15 @@ export default function GalleryModal({
     onSelect(multiSelect ? selectedUrls : selectedUrls[0]);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const filteredImages = images.filter((img) =>
     img.url?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -168,10 +172,12 @@ export default function GalleryModal({
                         : "border-gray-100 hover:border-gray-300"
                     }`}
                   >
-                    <img
+                    <Image
                       src={img.url}
-                      className="w-full h-full object-cover"
-                      alt=""
+                      className="object-cover"
+                      alt="Gallery Image"
+                      fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
                     />
                     {isSelected && (
                       <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1 shadow-sm">
@@ -202,6 +208,7 @@ export default function GalleryModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
