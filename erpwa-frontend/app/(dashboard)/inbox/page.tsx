@@ -915,13 +915,6 @@ export default function InboxPage() {
     }
   };
 
-  useEffect(() => {
-    loadInbox();
-    if (chatId) {
-      handleSelectConversation(chatId);
-    }
-  }, []);
-
   useInboxSocket({
     selectedConversation,
     readSentRef,
@@ -975,6 +968,10 @@ export default function InboxPage() {
                     buttons: m.outboundPayload.buttons,
                   }
                 : undefined),
+
+            // ✅ Map outboundPayload for interactive messages
+            outboundPayload: m.outboundPayload,
+            messageType: (m as any).messageType,
           };
         },
       );
@@ -1054,6 +1051,13 @@ export default function InboxPage() {
       toast.error("Failed to update status");
     }
   };
+
+  useEffect(() => {
+    loadInbox();
+    if (chatId) {
+      handleSelectConversation(chatId);
+    }
+  }, []);
 
   const currentConversation = conversations.find(
     (c) => c.id === selectedConversation,

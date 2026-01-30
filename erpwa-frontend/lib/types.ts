@@ -160,6 +160,8 @@ export interface Message {
     buttonValue?: string;
     buttonType?: string;
   }[];
+  outboundPayload?: any;
+  messageType?: string;
 }
 
 export interface Template {
