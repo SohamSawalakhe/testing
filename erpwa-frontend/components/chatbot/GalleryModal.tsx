@@ -8,12 +8,14 @@ import {
   Search,
   Check,
   Loader2,
+  Filter,
 } from "lucide-react";
 import Image from "next/image";
 import ReactDOM from "react-dom";
 import { galleryAPI } from "@/lib/galleryApi";
-import { categoriesAPI } from "@/lib/categoriesApi";
+import { categoriesAPI } from "@/lib/categoriesApi"; // ✅ Import categories API
 import api from "@/lib/api";
+import type { Category } from "@/lib/types"; // Assuming types exist
 
 interface GalleryModalProps {
   isOpen: boolean;
@@ -35,69 +37,62 @@ export default function GalleryModal({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Category State
-  const [categories, setCategories] = useState<any[]>([]); // Using any for simplicity, should be Category[]
+  // 🔹 Filter & Pagination State
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(
+    null,
+  );
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     if (isOpen) {
-      loadCategories();
-      fetchImages();
+      loadCategories(); // ✅ Load categories on open
       setSelectedUrls([]);
+      setPage(1);
+      setImages([]); // Reset images to avoid stale data
+      fetchImages(1, true); // Initial fetch
     }
   }, [isOpen]);
 
-  // Refetch images when filters change
-  useEffect(() => {
-    if (isOpen) {
-      fetchImages();
-    }
-  }, [selectedCategory, selectedSubcategory]);
-
+  // Fetches categories for the filter dropdown
   const loadCategories = async () => {
     try {
       const res = await categoriesAPI.list();
       setCategories(res.data || []);
-    } catch (error) {
-      console.error("Failed to load categories", error);
+    } catch (err) {
+      console.error("Failed to load categories", err);
     }
   };
 
-  const loadSubcategories = async (categoryId: number) => {
-    try {
-      const res = await categoriesAPI.detail(categoryId);
-      setSubcategories(res.data.subcategories || []);
-    } catch (error) {
-      console.error("Failed to load subcategories", error);
-      setSubcategories([]);
-    }
-  };
-
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const catId = e.target.value ? parseInt(e.target.value) : null;
-    setSelectedCategory(catId);
-    setSelectedSubcategory(null);
-    setSubcategories([]);
-
-    if (catId) {
-      loadSubcategories(catId);
-    }
-  };
-
-  const fetchImages = async () => {
+  // Fetches images with filters & pagination
+  const fetchImages = async (
+    pageNo: number,
+    reset = false,
+    catId?: number | null,
+    subCatId?: number | null,
+  ) => {
     try {
       setLoading(true);
-      // Pass category filters to API
       const res = await galleryAPI.list(
-        selectedCategory || undefined,
-        selectedSubcategory || undefined
+        catId ?? selectedCategory ?? undefined,
+        subCatId ?? selectedSubcategory ?? undefined,
+        pageNo,
+        20, // Limit
       );
-      setImages(res.data?.images || []);
+
+      const newImages = res.data?.images || [];
+      if (reset) {
+        setImages(newImages);
+      } else {
+        setImages((prev) => [...prev, ...newImages]);
+      }
+      setHasMore(newImages.length === 20); // Assume limit is 20
     } catch (error) {
       console.error("Failed to fetch images", error);
     } finally {
@@ -113,17 +108,19 @@ export default function GalleryModal({
       setUploading(true);
       const formData = new FormData();
       formData.append("file", file);
+      // Pass category context if selected
+      if (selectedCategory)
+        formData.append("category_id", selectedCategory.toString());
+      if (selectedSubcategory)
+        formData.append("subcategory_id", selectedSubcategory.toString());
 
-      // If category selected, append it
-      if (selectedCategory) formData.append("category_id", selectedCategory.toString());
-      if (selectedSubcategory) formData.append("subcategory_id", selectedSubcategory.toString());
-
-      // Use galleryAPI to upload if available, or generic
-      // galleryAPI.upload usually handles this
-      await galleryAPI.upload(formData); // Using galleryAPI wrapper instead of raw api request
+      await api.post("/gallery/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       // Refresh list
-      await fetchImages();
+      setPage(1);
+      fetchImages(1, true);
     } catch (error) {
       console.error("Upload failed", error);
     } finally {
@@ -145,16 +142,49 @@ export default function GalleryModal({
     onSelect(multiSelect ? selectedUrls : selectedUrls[0]);
   };
 
+  // Handle Filter Changes
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const catId = e.target.value ? Number(e.target.value) : null;
+    setSelectedCategory(catId);
+    setSelectedSubcategory(null); // Reset subcategory
+    setPage(1);
+
+    // Update subcategories list
+    if (catId) {
+      const cat = categories.find((c) => c.id === catId);
+      setSubcategories(cat?.subcategories || []);
+    } else {
+      setSubcategories([]);
+    }
+
+    fetchImages(1, true, catId, null);
+  };
+
+  const handleSubcategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const subId = e.target.value ? Number(e.target.value) : null;
+    setSelectedSubcategory(subId);
+    setPage(1);
+    fetchImages(1, true, selectedCategory, subId);
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchImages(nextPage, false);
+    }
+  };
+
   if (!isOpen || !mounted) return null;
 
-  // Client-side filtering for search query only (API handles categories)
+  // Local search Filter (applied on top of fetched images)
   const filteredImages = images.filter((img) =>
     (img.url || img.s3_url || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -163,59 +193,69 @@ export default function GalleryModal({
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full transition"
           >
             <X size={24} />
           </button>
         </div>
 
-        {/* Toolbar */}
-        <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex flex-col md:flex-row gap-4">
-
-          {/* Filters */}
-          <div className="flex gap-2 w-full md:w-auto">
-            <select
-              className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={selectedCategory || ""}
-              onChange={handleCategoryChange}
-            >
-              <option value="">All Categories</option>
-              {categories.map((cat: any) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-
-            <select
-              className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
-              value={selectedSubcategory || ""}
-              onChange={(e) => setSelectedSubcategory(e.target.value ? parseInt(e.target.value) : null)}
-              disabled={!selectedCategory || subcategories.length === 0}
-            >
-              <option value="">All Subcategories</option>
-              {subcategories.map((sub: any) => (
-                <option key={sub.id} value={sub.id}>{sub.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="relative flex-1">
+        {/* Toolbar with Filters */}
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex flex-wrap gap-4 items-center">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
             <Search
               className="absolute left-3 top-2.5 text-gray-400"
               size={18}
             />
             <input
               type="text"
-              placeholder="Search images..."
+              placeholder="Search loaded images..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-700 dark:text-gray-200"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white"
             />
           </div>
 
+          {/* Category Filter */}
+          <div className="flex items-center gap-2 min-w-[150px]">
+            <Filter size={16} className="text-gray-500" />
+            <select
+              className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary outline-none bg-white w-full"
+              value={selectedCategory || ""}
+              onChange={handleCategoryChange}
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Subcategory Filter */}
+          {subcategories.length > 0 && (
+            <div className="min-w-[150px]">
+              <select
+                className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary outline-none bg-white w-full"
+                value={selectedSubcategory || ""}
+                onChange={handleSubcategoryChange}
+              >
+                <option value="">All Subcategories</option>
+                {subcategories.map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Upload Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 transition disabled:opacity-50 font-medium text-sm whitespace-nowrap"
+            className="px-4 py-2 bg-primary text-white rounded-lg flex items-center gap-2 hover:bg-primary/90 transition disabled:opacity-50 shadow-sm"
           >
             {uploading ? (
               <Loader2 className="animate-spin" size={18} />
@@ -234,54 +274,67 @@ export default function GalleryModal({
         </div>
 
         {/* Grid */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 dark:bg-gray-900/50">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="animate-spin text-blue-500 mb-2" size={40} />
-              <p className="text-gray-500 text-sm">Loading media...</p>
-            </div>
-          ) : filteredImages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-              <ImageIcon size={48} className="mb-2 opacity-20" />
-              <p>No images found in this category.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {filteredImages.map((img, idx) => {
-                const url = img.s3_url || img.url;
-                if (!url) return null; // Skip invalid images
-
-                const isSelected = selectedUrls.includes(url);
-                return (
-                  <div
-                    key={img.id || idx}
-                    onClick={() => toggleSelection(url)}
-                    className={`group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all shadow-sm ${isSelected
-                      ? "border-blue-500 ring-2 ring-blue-500/20"
-                      : "border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-400"
-                      }`}
-                  >
-                    <Image
-                      src={url}
-                      className="object-cover transition-transform group-hover:scale-105"
-                      alt={img.title || "Gallery Image"}
-                      fill
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
-
-                    {/* Overlay Gradient */}
-                    <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 ${isSelected ? 'opacity-100' : ''}`}>
-                      {img.title && <p className="text-white text-xs font-medium truncate">{img.title}</p>}
+        <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-300">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filteredImages.map((img, idx) => {
+              const isSelected = selectedUrls.includes(img.url);
+              return (
+                <div
+                  key={idx}
+                  onClick={() => toggleSelection(img.url)}
+                  className={`group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${isSelected
+                      ? "border-primary ring-2 ring-primary/20 scale-[0.98]"
+                      : "border-gray-100 hover:border-gray-300 hover:shadow-md"
+                    }`}
+                >
+                  <Image
+                    src={img.url}
+                    className="object-cover"
+                    alt="Gallery Image"
+                    fill
+                    sizes="(max-width: 768px) 50vw, 20vw"
+                  />
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1.5 shadow-sm z-10">
+                      <Check size={14} strokeWidth={3} />
                     </div>
+                  )}
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  {/* Title Preview on Hover */}
+                  {img.title && (
+                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/60 text-white text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                      {img.title}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1 shadow-sm z-10">
-                        <Check size={12} strokeWidth={3} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          {/* Loading State or Empty */}
+          {loading && (
+            <div className="flex justify-center py-10 w-full">
+              <Loader2 className="animate-spin text-primary" size={40} />
+            </div>
+          )}
+
+          {!loading && filteredImages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+              <ImageIcon size={48} className="mb-2 opacity-20" />
+              <p>No images found</p>
+            </div>
+          )}
+
+          {/* Load More Trigger */}
+          {!loading && hasMore && filteredImages.length > 0 && (
+            <div className="flex justify-center py-6">
+              <button
+                onClick={loadMore}
+                className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-medium transition-colors"
+              >
+                Load More
+              </button>
             </div>
           )}
         </div>
@@ -295,7 +348,7 @@ export default function GalleryModal({
             <button
               onClick={handleConfirm}
               disabled={selectedUrls.length === 0}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               Insert Selected
             </button>

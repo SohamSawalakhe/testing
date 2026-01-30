@@ -347,6 +347,16 @@ router.post("/", async (req, res) => {
             include: { media: true },
           });
 
+          console.log(
+            "📤 Emitting message:new to conversation:",
+            conversation.id,
+          );
+          console.log("📤 Message data:", {
+            id: fullMessage.id,
+            sender: "customer",
+            text: fullMessage.media.length ? undefined : fullMessage.content,
+          });
+
           io.to(`conversation:${conversation.id}`).emit("message:new", {
             id: fullMessage.id,
             whatsappMessageId: fullMessage.whatsappMessageId,
@@ -542,6 +552,47 @@ router.post("/", async (req, res) => {
         direction: "inbound",
         whatsappBusinessId: wabaId, // Usually present for template updates
         whatsappPhoneNumberId: phoneNumberId || vendor.whatsappPhoneNumberId,
+      });
+    }
+
+    /* =====================================================
+       3️⃣ HANDLE TEMPLATE APPROVAL EVENTS
+    ===================================================== */
+    if (value.message_template_status_update) {
+      eventType = "template_status";
+      direction = "inbound";
+
+      const templateUpdate = value.message_template_status_update;
+      const templateEvent = templateUpdate.event; // APPROVED | REJECTED | PENDING
+      // const templateId = templateUpdate.message_template_id;
+
+      let opEvent = "Template Update";
+      let opStatus = "received";
+
+      if (templateEvent === "APPROVED") {
+        opEvent = "Template Created";
+        opStatus = "created";
+      } else if (templateEvent === "REJECTED") {
+        opEvent = "Template Rejected";
+        opStatus = "failed";
+      } else if (templateEvent === "PENDING") {
+        opEvent = "Template Pending";
+        opStatus = "pending";
+      } else {
+        // Fallback for "created" or other events
+        opEvent = templateEvent;
+        opStatus = "received";
+      }
+
+      await logActivity({
+        vendorId,
+        type: "Template", // Proper casing
+        status: opStatus,
+        event: opEvent,
+        payload: templateUpdate,
+        responseCode: 200,
+        processingMs: Date.now() - startTime,
+        direction: "inbound",
       });
     }
 

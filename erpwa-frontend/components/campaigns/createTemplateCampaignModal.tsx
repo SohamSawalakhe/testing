@@ -163,6 +163,7 @@ export default function CreateTemplateCampaignModal({
         name: campaignName,
         templateId: selectedTemplate.id,
         language: selectedTemplate.languages[0].language,
+        language: selectedTemplate.languages[0].language,
         recipients: Array.from(selectedRecipients).map(id => {
           const contact = contacts.find(c => c.id === id);
           return contact?.mobile_number;
