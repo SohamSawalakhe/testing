@@ -13,6 +13,8 @@ import Image from "next/image";
 import ReactDOM from "react-dom";
 import { galleryAPI } from "@/lib/galleryApi";
 import api from "@/lib/api";
+import { processMedia } from "@/lib/mediaProcessor";
+import { toast } from "react-toastify";
 
 interface GalleryModalProps {
   isOpen: boolean;
@@ -62,8 +64,11 @@ export default function GalleryModal({
 
     try {
       setUploading(true);
+
+      const { file: processedFile } = await processMedia(file);
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", processedFile);
       // Assuming generic upload endpoint
       // Adjust if you have a specific gallery upload endpoint
       await api.post("/upload", formData, {
@@ -72,7 +77,8 @@ export default function GalleryModal({
 
       // Refresh list
       await fetchImages();
-    } catch (error) {
+    } catch (error: any) {
+      toast.error(error.message || "Upload failed");
       console.error("Upload failed", error);
     } finally {
       setUploading(false);
@@ -166,11 +172,10 @@ export default function GalleryModal({
                   <div
                     key={idx}
                     onClick={() => toggleSelection(img.url)}
-                    className={`group relative aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
-                      isSelected
-                        ? "border-primary ring-2 ring-primary/20"
-                        : "border-gray-100 hover:border-gray-300"
-                    }`}
+                    className={`group relative aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${isSelected
+                      ? "border-primary ring-2 ring-primary/20"
+                      : "border-gray-100 hover:border-gray-300"
+                      }`}
                   >
                     <Image
                       src={img.url}

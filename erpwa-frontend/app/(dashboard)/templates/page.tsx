@@ -43,7 +43,8 @@ import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
 import { leadsAPI } from "@/lib/leadsApi";
 import { Lead } from "@/lib/types";
-import CatalogTemplateModal from "@/components/templates/CatalogTemplateModal";
+import CatalogTemplateModal from "../../../components/templates/CatalogTemplateModal";
+import { processMedia } from "@/lib/mediaProcessor";
 
 const formatError = (error: any, defaultMsg: string) => {
   const errorData = error.response?.data;
@@ -112,6 +113,8 @@ export default function TemplatesPage() {
     isOpen: boolean;
     id?: string;
     title?: string;
+    isMeta?: boolean;
+    metaName?: string;
   }>({ isOpen: false });
 
   // --- Create/Edit Modal State ---
@@ -407,7 +410,14 @@ export default function TemplatesPage() {
       }
 
       if (formData.headerType !== "TEXT" && headerFile) {
-        data.append("header.file", headerFile);
+        try {
+          const { file } = await processMedia(headerFile);
+          data.append("header.file", file);
+        } catch (err: any) {
+          toast.error(err.message || "Media validation failed");
+          setIsCreating(false);
+          return;
+        }
       }
 
       buttons.forEach((btn, index) => {
@@ -511,39 +521,53 @@ export default function TemplatesPage() {
   };
 
   const handleConfirmDelete = async () => {
-    if (!deleteConf.id) return;
+    if (!deleteConf.id && !deleteConf.metaName) return;
 
-    const id = deleteConf.id;
-    setDeleting(id);
-    try {
-      await api.delete(`/vendor/templates/${id}`);
-      toast.success("Template deleted successfully");
-      setTemplates((prev) => prev.filter((t) => t.id !== id));
-    } catch (error: any) {
-      toast.error(formatError(error, "Failed to delete template"));
-    } finally {
-      setDeleting(null);
-      setDeleteConf({ isOpen: false });
+    // Handle Meta Delete
+    if (deleteConf.isMeta && deleteConf.metaName) {
+      setDeleting(deleteConf.metaName);
+      try {
+        await api.delete(`/vendor/templates/meta?name=${encodeURIComponent(deleteConf.metaName)}`);
+        toast.success("Template deleted from Meta");
+        fetchAllTemplates(); // Refresh list to remove it
+      } catch (error: any) {
+        toast.error(formatError(error, "Failed to delete from Meta"));
+      } finally {
+        setDeleting(null);
+        setDeleteConf({ isOpen: false });
+      }
+      return;
+    }
+
+    // Handle Local Delete
+    if (deleteConf.id) {
+      const id = deleteConf.id;
+      setDeleting(id);
+      try {
+        await api.delete(`/vendor/templates/${id}`);
+        toast.success("Template deleted successfully");
+        setTemplates((prev) => prev.filter((t) => t.id !== id));
+      } catch (error: any) {
+        toast.error(formatError(error, "Failed to delete template"));
+      } finally {
+        setDeleting(null);
+        setDeleteConf({ isOpen: false });
+      }
     }
   };
 
-  const handleMetaDelete = async (metaName: string) => {
-    if (!metaName) return;
-    if (!confirm("Are you sure you want to delete this template from Meta? This cannot be undone.")) return;
-
-    setDeleting(metaName);
-    try {
-      await api.delete(`/vendor/templates/meta?name=${encodeURIComponent(metaName)}`);
-      toast.success("Template deleted from Meta");
-      fetchAllTemplates(); // Refresh list to remove it
-    } catch (error: any) {
-      toast.error(formatError(error, "Failed to delete from Meta"));
-    } finally {
-      setDeleting(null);
-    }
+  const handleMetaDelete = (metaName: string, displayName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteConf({
+      isOpen: true,
+      title: displayName || metaName,
+      isMeta: true,
+      metaName: metaName,
+    });
   };
 
-  const handleMetaSend = async (metaTpl: any) => {
+  const handleMetaSend = async (metaTpl: any, e: React.MouseEvent) => {
+    e.stopPropagation();
     setImporting(metaTpl.id || metaTpl.metaTemplateName);
     try {
       // Import first (it returns the full template object)
@@ -804,7 +828,7 @@ export default function TemplatesPage() {
               onClick={openCreateModal}
               className="shadow-lg shadow-green-500/20 bg-green-600 hover:bg-green-700 text-white transition-all hover:scale-105 active:scale-95"
             >
-              <Plus className="w-4 h-4 mr-2" /> New Template
+              <Plus className="w-4 h-4 mr-2" /> Standard Template
             </Button>
             <Button
               onClick={() => setShowCatalogModal(true)}
@@ -1052,7 +1076,7 @@ export default function TemplatesPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="flex-1 h-8 text-xs font-bold text-green-600 bg-green-500/5 hover:bg-green-500/10 hover:text-green-700"
-                                onClick={() => handleMetaSend(t)}
+                                onClick={(e) => handleMetaSend(t, e)}
                                 disabled={importing === (t.id || t.metaTemplateName)}
                               >
                                 {importing === (t.id || t.metaTemplateName) ? (
@@ -1067,7 +1091,7 @@ export default function TemplatesPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="flex-1 h-8 text-xs font-bold text-red-500/80 bg-red-500/5 hover:text-red-600 hover:bg-red-500/10 transition-all"
-                                onClick={() => handleMetaDelete(t.metaTemplateName)}
+                                onClick={(e) => handleMetaDelete(t.metaTemplateName, t.displayName, e)}
                                 disabled={deleting === t.metaTemplateName}
                               >
                                 {deleting === t.metaTemplateName ? (
