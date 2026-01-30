@@ -480,27 +480,7 @@ router.post("/", async (req, res) => {
           },
         });
 
-        // ============================================
-        // 🚀 WORKFLOW ENGINE INTEGRATION
-        // ============================================
-        try {
-          // 1. Check if user is already in a workflow session
-          const isSessionHandled = await handleWorkflowResponse(
-            vendor.id,
-            conversation.id,
-            inboundMessage,
-          );
-
-          if (!isSessionHandled) {
-            // 2. If not, check if message triggers a NEW workflow
-            // Content variable is already extracted above
-            await checkAndStartWorkflow(vendor.id, conversation.id, content);
-          }
-        } catch (wfError) {
-          console.error("Workflow Error:", wfError);
-        }
-
-        // Handle Media download logic (removed for brevity, but assumed unchanged if not shown)
+        // Handle Media download logic
         if (
           ["image", "video", "audio", "document", "sticker"].includes(msg.type)
         ) {
@@ -583,6 +563,26 @@ router.post("/", async (req, res) => {
             caption: fullMessage.media[0]?.caption,
           });
         } catch (socketErr) {}
+
+        // ============================================
+        // 🚀 WORKFLOW ENGINE INTEGRATION
+        // ============================================
+        try {
+          // 1. Check if user is already in a workflow session
+          const isSessionHandled = await handleWorkflowResponse(
+            vendor.id,
+            conversation.id,
+            inboundMessage,
+          );
+
+          if (!isSessionHandled) {
+            // 2. If not, check if message triggers a NEW workflow
+            // Content variable is already extracted above
+            await checkAndStartWorkflow(vendor.id, conversation.id, content);
+          }
+        } catch (wfError) {
+          console.error("Workflow Error:", wfError);
+        }
 
         // Log successful message processing
         await logActivity({
