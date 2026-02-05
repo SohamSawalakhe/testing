@@ -157,8 +157,6 @@ export default function MessageBubble({
   allMessages,
   onOpenMenu,
   onReply,
-  setInputValue,
-  inputRef,
   shouldAnimate = false,
 }: Props) {
   // Prioritize finding the full message from history.
@@ -220,7 +218,6 @@ export default function MessageBubble({
       effectiveMimeType?.includes("document")) &&
     msg.template?.header?.type !== "DOCUMENT"
   );
-  const isMedia = isImage || isVideo || isAudio || isDocument;
 
   const formattedTime = new Date(msg.timestamp)
     .toLocaleTimeString([], {
@@ -396,7 +393,7 @@ export default function MessageBubble({
                 {cleanText && (
                   <div className="relative px-2 pb-2">
                     <p
-                      className={`text-[13px] break-words whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? "pb-1" : "pb-4"}`}
+                      className={`text-[13px] wrap-break-word whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? "pb-1" : "pb-4"}`}
                     >
                       {cleanText}
                     </p>
@@ -434,7 +431,7 @@ export default function MessageBubble({
                 {cleanText && (
                   <div className="relative px-2 pb-2">
                     <p
-                      className={`text-[13px] break-words whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? "pb-1" : "pb-4"}`}
+                      className={`text-[13px] wrap-break-word whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? "pb-1" : "pb-4"}`}
                     >
                       {cleanText}
                     </p>
@@ -533,7 +530,7 @@ export default function MessageBubble({
                   </div>
                 </div>
                 {repliedMessage.mediaUrl && (
-                  <div className="shrink-0 w-12 h-12 rounded bg-muted/20 overflow-hidden">
+                  <div className="relative shrink-0 w-12 h-12 rounded bg-muted/20 overflow-hidden">
                     {repliedMessage.mimeType?.startsWith("image/") ? (
                       <Image
                         src={repliedMessage.mediaUrl}
@@ -570,7 +567,7 @@ export default function MessageBubble({
 
             {/* TEXT - Only for non-media messages */}
             {cleanText && !isImage && !isVideo && (
-              <div className="px-2 text-sm break-words whitespace-pre-wrap">
+              <div className="px-2 text-sm wrap-break-word whitespace-pre-wrap">
                 {cleanText}
                 {/* Hide timestamp if template has footer */}
                 {!msg.template?.footer && (
@@ -759,7 +756,7 @@ export default function MessageBubble({
                         {/* Card Text (Body) */}
                         {card.title && (
                           <div className="px-2 py-1.5">
-                            <p className="text-[14px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[18px] line-clamp-2 font-medium">
+                            <p className="text-[14px] text-gray-900 dark:text-gray-100 wrap-break-word whitespace-pre-wrap leading-[18px] line-clamp-2 font-medium">
                               {card.title}
                             </p>
                           </div>
@@ -812,7 +809,7 @@ export default function MessageBubble({
                     className="bg-background rounded-lg p-2 border border-border/50 flex flex-col gap-1"
                   >
                     <div className="relative w-full aspect-square bg-muted/20 rounded mb-1">
-                      {prod.retailerProductCode ? (
+                      {prod.productId ? (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
                           {/* Placeholder since we don't have catalog image fetcher yet */}
                           <ShoppingBag className="w-6 h-6 opacity-20" />
@@ -820,11 +817,93 @@ export default function MessageBubble({
                       ) : null}
                     </div>
                     <div className="font-medium text-xs truncate">
-                      Code: {prod.retailerProductCode}
+                      Code: {prod.productId}
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+        {/* LIST MENUS (External) */}
+        {msg.outboundPayload?.interactive &&
+          msg.outboundPayload.interactive.type === "list" && (
+            <div className="w-full">
+              <button
+                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${
+                  msg.sender === "executive"
+                    ? "bg-wa-outbound"
+                    : "bg-wa-inbound"
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+                {msg.outboundPayload.interactive.action?.button || "Menu"}
+              </button>
+            </div>
+          )}
+
+        {/* EXTERNAL REPLY BUTTONS */}
+        {msg.outboundPayload?.interactive &&
+          msg.outboundPayload.interactive.type === "button" && (
+            <div className="w-full flex flex-col gap-1">
+              <div
+                className={`flex gap-1.5 w-full ${
+                  msg.outboundPayload.interactive.action?.buttons?.length === 2
+                    ? "flex-row"
+                    : "flex-col"
+                }`}
+              >
+                {msg.outboundPayload.interactive.action?.buttons?.map(
+                  (btn: { reply?: { title: string } }, idx: number) => (
+                    <button
+                      key={idx}
+                      className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 ${
+                        msg.sender === "executive"
+                          ? "bg-wa-outbound"
+                          : "bg-wa-inbound"
+                      }`}
+                    >
+                      {btn.reply?.title}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+          )}
+
+        {/* CTA URL (External) */}
+        {msg.outboundPayload?.interactive &&
+          msg.outboundPayload.interactive.type === "cta_url" && (
+            <div className="w-full">
+              <button
+                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 border border-black/5 dark:border-white/5 ${
+                  msg.sender === "executive"
+                    ? "bg-wa-outbound"
+                    : "bg-wa-inbound"
+                }`}
+                onClick={() => {
+                  const url =
+                    msg.outboundPayload?.interactive?.action?.parameters?.url;
+                  if (url) window.open(url, "_blank");
+                }}
+              >
+                🔗{" "}
+                {msg.outboundPayload.interactive.action?.parameters
+                  ?.display_text || "Click Here"}
+              </button>
             </div>
           )}
       </div>
