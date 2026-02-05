@@ -47,6 +47,17 @@ interface Template {
     value?: string;
   }[];
   templateType?: string;
+  carouselCards?: {
+    id: string;
+    title: string;
+    subtitle: string;
+    s3Url: string | null;
+    mimeType: string | null;
+    buttonText?: string;
+    buttonValue?: string;
+    buttonType?: string;
+    position: number;
+  }[];
 }
 
 export default function CreateTemplateCampaignModal({
@@ -661,6 +672,53 @@ export default function CreateTemplateCampaignModal({
                             <div className="p-1">
                               {/* Header Media */}
                               {(() => {
+                                // Check for Carousel Cards
+                                if (
+                                  selectedTemplate.carouselCards &&
+                                  selectedTemplate.carouselCards.length > 0
+                                ) {
+                                  return (
+                                    <div className="flex overflow-x-auto gap-3 pb-4 -mx-1 px-1 snap-x custom-scrollbar">
+                                      {selectedTemplate.carouselCards.map(
+                                        (card, i) => (
+                                          <div
+                                            key={i}
+                                            className="flex-shrink-0 w-[200px] bg-black/20 rounded-xl overflow-hidden snap-center flex flex-col border border-white/10 shadow-sm"
+                                          >
+                                            {/* Card Media */}
+                                            {card.s3Url ? (
+                                              <img
+                                                src={card.s3Url}
+                                                alt={card.title || "Card"}
+                                                className="w-full h-30 object-cover"
+                                              />
+                                            ) : (
+                                              <div className="h-30 bg-white/5 flex items-center justify-center">
+                                                <ImageIcon className="w-8 h-8 opacity-30 text-white" />
+                                              </div>
+                                            )}
+                                            {/* Card Content */}
+                                            {(card.title || card.subtitle) && (
+                                              <div className="p-3 space-y-1 bg-[#202c33] min-h-[70px] flex flex-col justify-center">
+                                                {card.title && (
+                                                  <p className="font-bold text-sm text-white truncate leading-tight">
+                                                    {card.title}
+                                                  </p>
+                                                )}
+                                                {card.subtitle && (
+                                                  <p className="text-xs text-white/60 truncate leading-tight">
+                                                    {card.subtitle}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ),
+                                      )}
+                                    </div>
+                                  );
+                                }
+
                                 const mediaItem = selectedTemplate.media?.find(
                                   (m) =>
                                     m.language ===
@@ -674,6 +732,7 @@ export default function CreateTemplateCampaignModal({
                                         <video
                                           src={mediaItem.s3Url}
                                           className="w-full h-full object-contain"
+                                          controls
                                         />
                                       ) : (
                                         <img

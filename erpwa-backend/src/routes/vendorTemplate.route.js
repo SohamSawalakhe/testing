@@ -145,7 +145,9 @@ router.post(
       buttons = [],
       metaId,
       status = "approved",
-      headerMediaUrl = null // Header image URL from Meta
+      headerMediaUrl = null, // Header image URL from Meta
+      templateType = 'standard',
+      carouselCards = []
     } = req.body;
 
     // Helper to process media
@@ -223,6 +225,46 @@ router.post(
         }
       }
 
+      // Update Carousel Cards for existing template (Sync details)
+      if (templateType === 'carousel' && carouselCards.length > 0) {
+        await prisma.templateCarouselCard.deleteMany({ where: { templateId: existing.id } });
+
+        for (let i = 0; i < carouselCards.length; i++) {
+          const card = carouselCards[i];
+
+          let s3Url = null;
+          let mimeType = null;
+
+          if (card.s3Url) {
+            let type = "IMAGE";
+            if (card.mimeType && card.mimeType.includes("video")) type = "VIDEO";
+
+            // Reuse existing function logic or simplified since we can't easily access helper scope inside this block if it was defined weirdly? 
+            // Ah, processMedia is defined in scope properly.
+
+            const processed = await processMedia(card.s3Url, type, existing.id, language);
+            if (processed) {
+              s3Url = processed.url;
+              mimeType = processed.mimeType;
+            }
+          }
+
+          await prisma.templateCarouselCard.create({
+            data: {
+              templateId: existing.id,
+              title: card.title || "",
+              subtitle: card.subtitle || "",
+              buttonText: card.buttonText || null,
+              buttonValue: card.buttonValue || null,
+              buttonType: card.buttonType || (card.buttonValue ? "URL" : null),
+              position: i,
+              s3Url: s3Url,
+              mimeType: mimeType
+            }
+          });
+        }
+      }
+
       // Return refreshed template
       const updated = await prisma.template.findUnique({
         where: { id: existing.id },
@@ -239,6 +281,7 @@ router.post(
         displayName,
         category,
         status: status, // Trusted from Meta
+        templateType,
         createdBy: req.user.id,
       },
     });
@@ -280,6 +323,41 @@ router.post(
       });
     }
 
+    // Create Carousel Cards
+    if (templateType === 'carousel' && carouselCards.length > 0) {
+      for (let i = 0; i < carouselCards.length; i++) {
+        const card = carouselCards[i];
+
+        let s3Url = null;
+        let mimeType = null;
+
+        if (card.s3Url) {
+          let type = "IMAGE";
+          if (card.mimeType && card.mimeType.includes("video")) type = "VIDEO";
+
+          const processed = await processMedia(card.s3Url, type, template.id, language);
+          if (processed) {
+            s3Url = processed.url;
+            mimeType = processed.mimeType;
+          }
+        }
+
+        await prisma.templateCarouselCard.create({
+          data: {
+            templateId: template.id,
+            title: card.title || "",
+            subtitle: card.subtitle || "",
+            buttonText: card.buttonText || null,
+            buttonValue: card.buttonValue || null,
+            buttonType: card.buttonType || (card.buttonValue ? "URL" : null),
+            position: i,
+            s3Url: s3Url,
+            mimeType: mimeType
+          }
+        });
+      }
+    }
+
     // Create buttons
     if (buttons.length > 0) {
       for (let i = 0; i < buttons.length; i++) {
@@ -298,7 +376,12 @@ router.post(
 
     const fullTemplate = await prisma.template.findUnique({
       where: { id: template.id },
-      include: { languages: true, buttons: true, media: true }
+      include: {
+        languages: true,
+        buttons: true,
+        media: true,
+        carouselCards: { orderBy: { position: 'asc' } }
+      }
     });
 
     res.json(fullTemplate);
@@ -636,6 +719,8 @@ router.get(
       include: {
         languages: true,
         buttons: true,
+        media: true,
+        carouselCards: { orderBy: { position: 'asc' } }
       },
     });
 

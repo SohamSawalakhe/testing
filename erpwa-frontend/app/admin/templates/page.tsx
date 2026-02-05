@@ -93,6 +93,7 @@ type Template = {
   createdByName?: string;
   isMetaOnly?: boolean;
   originalName?: string;
+  carouselCards?: any[];
 };
 
 export default function TemplatesPage() {
@@ -217,12 +218,13 @@ export default function TemplatesPage() {
   const parseMetaTemplate = (metaTpl: any) => {
     try {
       const components = metaTpl.components || [];
-      const bodyComp = components.find((c: any) => c.type === "BODY");
+      const carouselComp = components.find((c: any) => c.type === "CAROUSEL");
+      const bodyComp = components.find((c: any) => c.type === "BODY") || (carouselComp ? { text: "Carousel Template" } : null);
       const headerComp = components.find((c: any) => c.type === "HEADER");
       const buttonsComp = components.find((c: any) => c.type === "BUTTONS");
 
-      // If no body, skip
-      if (!bodyComp || !bodyComp.text) return null;
+      // If no valid message content, skip
+      if (!bodyComp && !carouselComp) return null;
 
       const buttons = buttonsComp?.buttons?.map((b: any) => ({
         type: b.type,
@@ -232,7 +234,7 @@ export default function TemplatesPage() {
         value: b.url || b.phone_number || ""
       })) || [];
 
-      const headerType = headerComp?.format || "TEXT";
+      const headerType = headerComp?.format || (carouselComp ? "CAROUSEL" : "TEXT");
 
       // Extract header media URL from Meta's example field for preview
       let headerMediaUrl: string | null = null;
@@ -241,6 +243,40 @@ export default function TemplatesPage() {
         if (Array.isArray(urlArray) && urlArray.length > 0) {
           headerMediaUrl = urlArray[0];
         }
+      }
+
+      // Parse Carousel Cards
+      let carouselCards: any[] = [];
+      if (carouselComp && carouselComp.cards) {
+        carouselCards = carouselComp.cards.map((card: any, index: number) => {
+          const cardHeader = card.components.find((c: any) => c.type === "HEADER");
+          const cardBody = card.components.find((c: any) => c.type === "BODY");
+          const cardButtons = card.components.find((c: any) => c.type === "BUTTONS");
+
+          // Extract media
+          let cardS3Url = null;
+          let mimeType = null;
+          if (cardHeader && cardHeader.format === "IMAGE" && cardHeader.example) {
+            const urls = cardHeader.example.header_handle || cardHeader.example.header_url;
+            if (Array.isArray(urls) && urls.length > 0) cardS3Url = urls[0];
+            mimeType = "image/jpeg";
+          } else if (cardHeader && cardHeader.format === "VIDEO" && cardHeader.example) {
+            const urls = cardHeader.example.header_handle || cardHeader.example.header_url;
+            if (Array.isArray(urls) && urls.length > 0) cardS3Url = urls[0];
+            mimeType = "video/mp4";
+          }
+
+          return {
+            title: "",
+            subtitle: cardBody?.text || "",
+            position: index,
+            s3Url: cardS3Url,
+            mimeType: mimeType,
+            buttonText: cardButtons?.buttons?.[0]?.text,
+            buttonType: cardButtons?.buttons?.[0]?.type,
+            buttonValue: cardButtons?.buttons?.[0]?.url || cardButtons?.buttons?.[0]?.phone_number
+          };
+        });
       }
 
       const media = headerMediaUrl ? [{
@@ -257,6 +293,8 @@ export default function TemplatesPage() {
         metaTemplateName: metaTpl.name,
         category: metaTpl.category,
         status: metaTpl.status.toLowerCase(),
+        templateType: carouselComp ? 'carousel' : 'standard',
+        carouselCards: carouselCards,
         languages: [{
           language: metaTpl.language,
           body: bodyComp.text,
@@ -654,15 +692,18 @@ export default function TemplatesPage() {
         buttons: metaTpl.buttons,
         metaId: metaTpl.id,
         status: metaTpl.status,
-        headerMediaUrl: headerMediaUrl
+        headerMediaUrl: headerMediaUrl,
+        templateType: metaTpl.templateType || 'standard',
+        carouselCards: metaTpl.carouselCards || []
       });
 
       const newTemplate = res.data;
 
-      // Merge media from the parsed Meta template
+      // Merge media and cards from the parsed Meta template/backend response
       const templateWithMedia = {
         ...newTemplate,
-        media: newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media
+        media: newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media,
+        carouselCards: newTemplate.carouselCards?.length > 0 ? newTemplate.carouselCards : metaTpl.carouselCards
       };
 
       // Update local list with the new template
@@ -1148,9 +1189,9 @@ export default function TemplatesPage() {
                                 handleSyncStatus(t.id, e);
                               }
                             }}
-                            disabled={!!syncing || !!submitting}
+                            disabled={!!syncing || !!submitting || !!importing}
                           >
-                            {syncing === t.id || submitting === t.id ? (
+                            {syncing === t.id || submitting === t.id || importing === t.id ? (
                               <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
                             ) : t.status === "draft" ? (
                               <Upload className="w-3 h-3 mr-1.5" />
@@ -1162,7 +1203,7 @@ export default function TemplatesPage() {
                             {t.status === "draft"
                               ? "Submit"
                               : t.status === "approved"
-                                ? "Send"
+                                ? (importing === t.id ? "Preparing..." : "Send")
                                 : "Sync"}
                           </Button>
                           <div className="w-px h-4 bg-border/60"></div>
@@ -1331,78 +1372,119 @@ export default function TemplatesPage() {
                       <Eye className="w-3.5 h-3.5" />
                       Preview
                     </label>
-                    <div className="bg-white dark:bg-card p-4 rounded-lg shadow-sm border border-border/20 text-sm whitespace-pre-wrap leading-relaxed">
-                      {/* Media Header Preview */}
-                      {selectedTemplate.languages[0]?.headerType !== "TEXT" && (() => {
-                        const mediaItem = selectedTemplate.media?.find(m => m.language === selectedTemplate.languages[0]?.language);
-                        if (mediaItem?.s3Url) {
-                          if (selectedTemplate.languages[0].headerType === "IMAGE") {
-                            return (
-                              <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 shadow-md flex items-center justify-center min-h-[140px]">
-                                <img src={mediaItem.s3Url} alt="Header" className="w-full h-full object-contain" />
-                              </div>
-                            );
-                          } else if (selectedTemplate.languages[0].headerType === "VIDEO") {
-                            return (
-                              <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 relative shadow-md flex items-center justify-center min-h-[140px]">
-                                <video src={mediaItem.s3Url} className="w-full h-full object-contain" />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                                  <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white">
-                                    <Video className="w-5 h-5" />
+                    {selectedTemplate.templateType === 'carousel' && selectedTemplate.carouselCards && selectedTemplate.carouselCards.length > 0 ? (
+                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x px-1">
+                        {selectedTemplate.carouselCards.map((card: any, idx: number) => (
+                          <div key={idx} className="min-w-[200px] max-w-[220px] bg-white dark:bg-card rounded-lg shadow-sm border border-border/20 overflow-hidden flex-shrink-0 snap-center">
+                            {/* Card Media */}
+                            <div className="h-[120px] bg-black/10 relative flex items-center justify-center overflow-hidden">
+                              {card.s3Url ? (
+                                card.mimeType?.includes("video") ? (
+                                  <div className="relative w-full h-full">
+                                    <video src={card.s3Url} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                      <Video className="w-6 h-6 text-white" />
+                                    </div>
                                   </div>
+                                ) : (
+                                  <img src={card.s3Url} alt="Card" className="w-full h-full object-cover" />
+                                )
+                              ) : (
+                                <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
+                              )}
+                            </div>
+
+                            {/* Card Body */}
+                            <div className="p-3">
+                              {card.title && <p className="font-bold text-xs mb-1">{card.title}</p>}
+                              <p className="text-xs text-muted-foreground line-clamp-3">{card.subtitle || card.body}</p>
+                            </div>
+
+                            {/* Card Buttons */}
+                            {(card.buttonText || (card.buttons && card.buttons.length > 0)) && (
+                              <div className="px-3 pb-3 pt-0">
+                                <div className="w-full py-1.5 rounded bg-primary/5 text-primary text-[10px] font-medium text-center border border-primary/10">
+                                  {card.buttonText || card.buttons?.[0]?.text || "View"}
                                 </div>
                               </div>
-                            );
-                          }
-                        }
-                        return null;
-                      })()}
-
-                      {/* Header Text Preview */}
-                      {selectedTemplate.languages[0]?.headerType === "TEXT" && selectedTemplate.languages[0]?.headerText && (
-                        <p className="font-bold text-sm mb-2 text-foreground">
-                          {selectedTemplate.languages[0].headerText}
-                        </p>
-                      )}
-
-                      <div className="text-foreground/90">
-                        {(() => {
-                          let body = selectedTemplate.languages[0]?.body || "";
-                          variables.forEach((val, idx) => {
-                            const placeholder = `{{${idx + 1}}}`;
-                            body = body.replace(placeholder, val || placeholder);
-                          });
-                          return body;
-                        })()}
+                            )}
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <div className="bg-white dark:bg-card p-4 rounded-lg shadow-sm border border-border/20 text-sm whitespace-pre-wrap leading-relaxed">
+                        {/* Media Header Preview */}
+                        {selectedTemplate.languages[0]?.headerType !== "TEXT" && (() => {
+                          const mediaItem = selectedTemplate.media?.find(m => m.language === selectedTemplate.languages[0]?.language);
+                          if (mediaItem?.s3Url) {
+                            if (selectedTemplate.languages[0].headerType === "IMAGE") {
+                              return (
+                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 shadow-md flex items-center justify-center min-h-[140px]">
+                                  <img src={mediaItem.s3Url} alt="Header" className="w-full h-full object-contain" />
+                                </div>
+                              );
+                            } else if (selectedTemplate.languages[0].headerType === "VIDEO") {
+                              return (
+                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 relative shadow-md flex items-center justify-center min-h-[140px]">
+                                  <video src={mediaItem.s3Url} className="w-full h-full object-contain" />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                    <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white">
+                                      <Video className="w-5 h-5" />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }
+                          return null;
+                        })()}
 
-                      {selectedTemplate.languages[0]?.footerText && (
-                        <p className="mt-3 text-[11px] text-muted-foreground border-t border-border/40 pt-2 italic">
-                          {selectedTemplate.languages[0].footerText}
-                        </p>
-                      )}
+                        {/* Header Text Preview */}
+                        {selectedTemplate.languages[0]?.headerType === "TEXT" && selectedTemplate.languages[0]?.headerText && (
+                          <p className="font-bold text-sm mb-2 text-foreground">
+                            {selectedTemplate.languages[0].headerText}
+                          </p>
+                        )}
 
-                      {/* Buttons */}
-                      {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-border/40 space-y-2">
-                          {selectedTemplate.buttons.map((btn, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer text-primary font-medium text-sm"
-                            >
-                              {btn.type === "URL" ? (
-                                <Globe className="w-4 h-4" />
-                              ) : btn.type === "PHONE_NUMBER" ? (
-                                <Phone className="w-4 h-4" />
-                              ) : (
-                                <Send className="w-4 h-4" />
-                              )}
-                              {btn.text}
-                            </div>
-                          ))}
+                        <div className="text-foreground/90">
+                          {(() => {
+                            let body = selectedTemplate.languages[0]?.body || "";
+                            variables.forEach((val, idx) => {
+                              const placeholder = `{{${idx + 1}}}`;
+                              body = body.replace(placeholder, val || placeholder);
+                            });
+                            return body;
+                          })()}
                         </div>
-                      )}
-                    </div>
+
+                        {selectedTemplate.languages[0]?.footerText && (
+                          <p className="mt-3 text-[11px] text-muted-foreground border-t border-border/40 pt-2 italic">
+                            {selectedTemplate.languages[0].footerText}
+                          </p>
+                        )}
+
+                        {/* Buttons */}
+                        {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-border/40 space-y-2">
+                            {selectedTemplate.buttons.map((btn, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer text-primary font-medium text-sm"
+                              >
+                                {btn.type === "URL" ? (
+                                  <Globe className="w-4 h-4" />
+                                ) : btn.type === "PHONE_NUMBER" ? (
+                                  <Phone className="w-4 h-4" />
+                                ) : (
+                                  <Send className="w-4 h-4" />
+                                )}
+                                {btn.text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Variables Section */}

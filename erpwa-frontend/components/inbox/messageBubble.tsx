@@ -146,15 +146,21 @@ export default function MessageBubble({
   allMessages,
   onOpenMenu,
   onReply,
+  setInputValue,
+  inputRef,
 }: Props) {
-  const repliedMessage =
-    msg.replyTo ??
-    allMessages.find((m) => m.whatsappMessageId === msg.replyToMessageId);
-
-  // Type guard to check if repliedMessage is a full Message (not just replyTo)
-  const isFullMessage = (msg: typeof repliedMessage): msg is Message => {
-    return msg !== undefined && "id" in msg && "timestamp" in msg;
-  };
+  // Prioritize finding the full message from history.
+  // If not found, fall back to the snapshot in `msg.replyTo` but cast/shape it as a Message.
+  const repliedMessage: Message | undefined =
+    allMessages.find((m) => m.whatsappMessageId === msg.replyToMessageId) ??
+    (msg.replyTo
+      ? ({
+        ...msg.replyTo,
+        id: msg.replyToMessageId || "unknown",
+        whatsappMessageId: msg.replyToMessageId,
+        timestamp: "", // Fallback as we don't have the original timestamp
+      } as Message)
+      : undefined);
 
   const cleanText =
     (msg.text || "")
@@ -264,10 +270,7 @@ export default function MessageBubble({
     >
       <div
         className={`flex flex-col gap-1
-        ${(isImage || isVideo) ? 'w-fit' :
-            (msg.template?.header?.type === 'IMAGE' || msg.template?.header?.type === 'VIDEO')
-              ? 'w-fit max-w-[280px]'
-              : 'max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]'}
+        ${(isImage || isVideo) ? 'w-fit' : 'max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]'}
         ${msg.outboundPayload?.interactive || msg.template?.buttons
             ? "min-w-[200px]"
             : (isImage || isVideo) ? "" : "min-w-[120px]"
@@ -485,12 +488,7 @@ export default function MessageBubble({
             {msg.replyToMessageId && repliedMessage && (
               <div
                 className="mx-1 px-3 py-2 bg-black/5 dark:bg-white/10 border-l-4 border-primary rounded flex gap-2 cursor-pointer"
-                onClick={() => {
-                  // Only call onReply if repliedMessage is a full Message object (has id and timestamp)
-                  if (isFullMessage(repliedMessage)) {
-                    onReply?.(repliedMessage);
-                  }
-                }}
+                onClick={() => onReply?.(repliedMessage)}
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-primary mb-1">
@@ -709,8 +707,8 @@ export default function MessageBubble({
 
                           {/* Card Text (Body) */}
                           {card.title && (
-                            <div className="px-2 py-1">
-                              <p className="text-[12px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[16px] line-clamp-2">
+                            <div className="px-2 py-1.5">
+                              <p className="text-[14px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[18px] line-clamp-2 font-medium">
                                 {card.title}
                               </p>
                             </div>
@@ -818,7 +816,7 @@ export default function MessageBubble({
                   }`}
               >
                 {msg.outboundPayload.interactive.action?.buttons?.map(
-                  (btn: { reply: { title: string } }, idx: number) => (
+                  (btn: any, idx: number) => (
                     <button
                       key={idx}
                       className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 ${msg.sender === "executive"
