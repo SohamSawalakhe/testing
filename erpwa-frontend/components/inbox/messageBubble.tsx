@@ -625,7 +625,7 @@ export default function MessageBubble({
               };
 
               return (
-                <div className="relative mt-2 group/carousel">
+                <div className="relative group/carousel">
                   {/* Left Navigation Button */}
                   {showNavButtons && (
                     <button
@@ -746,7 +746,7 @@ export default function MessageBubble({
         {msg.template?.templateType === "catalog" &&
           msg.template.catalogProducts &&
           msg.template.catalogProducts.length > 0 && (
-            <div className="w-full mt-2 p-2 bg-wa-inbound rounded-xl border border-border/50 overflow-hidden">
+            <div className="w-full p-2 bg-wa-inbound rounded-xl border border-border/50 overflow-hidden">
               <div className="grid grid-cols-2 gap-2">
                 {msg.template.catalogProducts.slice(0, 4).map((product, idx) => (
                   <div
