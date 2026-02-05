@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Trash2, Image as ImageIcon, ShoppingBag, Layers, Upload, Eye, FileText, Video, MoreVertical, Phone, Globe, Workflow, CheckCircle, RefreshCw, Loader2, AlertTriangle, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Plus, Trash2, Image as ImageIcon, ShoppingBag, Paperclip, Layers, Upload, Eye, FileText, Video, MoreVertical, Phone, Globe, Workflow, CheckCircle, RefreshCw, Loader2, AlertTriangle, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
 import GalleryModal from "@/components/chatbot/GalleryModal";
@@ -598,6 +598,12 @@ export default function CatalogTemplateModal({ isOpen, onClose, onSubmit, initia
 
                                             <div className="relative z-10 w-full flex flex-col gap-1 mt-1 animate-in fade-in zoom-in-95 duration-500">
                                                 <div className="bg-card rounded-2xl rounded-tl-none shadow-lg relative overflow-hidden group border border-border">
+                                                    {(templateType === 'catalog' || templateType === 'carousel') && (
+                                                        <div className="flex items-center gap-2 px-3 pt-3 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
+                                                            <Paperclip className="w-3.5 h-3.5" />
+                                                            {templateType}
+                                                        </div>
+                                                    )}
                                                     <div className="px-3 pt-3 pb-3 text-[13px] leading-snug text-foreground/80 whitespace-pre-wrap font-sans">
                                                         {bodyText || "Design your message and it will appear here in real-time..."}
 

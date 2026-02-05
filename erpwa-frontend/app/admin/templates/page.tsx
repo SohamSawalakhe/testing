@@ -316,13 +316,13 @@ export default function TemplatesPage() {
 
       const media = headerMediaUrl
         ? [
-            {
-              id: `meta-media-${metaTpl.id}`,
-              mediaType: headerType.toLowerCase(),
-              s3Url: headerMediaUrl,
-              language: metaTpl.language,
-            },
-          ]
+          {
+            id: `meta-media-${metaTpl.id}`,
+            mediaType: headerType.toLowerCase(),
+            s3Url: headerMediaUrl,
+            language: metaTpl.language,
+          },
+        ]
         : [];
 
       return {
@@ -552,10 +552,10 @@ export default function TemplatesPage() {
           prev.map((t) =>
             t.id === editId
               ? {
-                  ...t,
-                  displayName: formData.displayName,
-                  category: formData.category,
-                }
+                ...t,
+                displayName: formData.displayName,
+                category: formData.category,
+              }
               : t,
           ),
         );
@@ -737,6 +737,56 @@ export default function TemplatesPage() {
     });
   };
 
+  const handleMetaSyncStatus = async (metaTpl: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSyncing(metaTpl.id || metaTpl.metaTemplateName);
+    try {
+      const headerMediaUrl = metaTpl.media?.[0]?.s3Url || null;
+      const res = await api.post("/vendor/templates/import", {
+        metaTemplateName: metaTpl.metaTemplateName,
+        displayName: metaTpl.displayName,
+        category: metaTpl.category,
+        language: metaTpl.languages[0].language,
+        body: metaTpl.languages[0].body,
+        headerType: metaTpl.languages[0].headerType,
+        headerText: metaTpl.languages[0].headerText,
+        footerText: metaTpl.languages[0].footerText,
+        buttons: metaTpl.buttons,
+        metaId: metaTpl.id,
+        status: metaTpl.status,
+        headerMediaUrl: headerMediaUrl,
+        templateType: metaTpl.templateType || "standard",
+        carouselCards: metaTpl.carouselCards || [],
+      });
+
+      const newTemplate = res.data;
+      const templateWithMedia = {
+        ...newTemplate,
+        media:
+          newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media,
+        carouselCards:
+          newTemplate.carouselCards?.length > 0
+            ? newTemplate.carouselCards
+            : metaTpl.carouselCards,
+      };
+
+      setTemplates((prev) => {
+        return prev.map((p) =>
+          p.metaTemplateName === newTemplate.metaTemplateName
+            ? templateWithMedia
+            : p,
+        );
+      });
+      toast.success(
+        `"${newTemplate.displayName}" synced and approved successfully`,
+      );
+    } catch (error: any) {
+      toast.error(formatError(error, "Failed to sync template status"));
+    } finally {
+      setSyncing(null);
+    }
+  };
+
   const handleMetaSend = async (metaTpl: any, e: React.MouseEvent) => {
     e.stopPropagation();
     setImporting(metaTpl.id || metaTpl.metaTemplateName);
@@ -793,7 +843,7 @@ export default function TemplatesPage() {
 
   const handleCardClick = (template: Template) => {
     if (template.isMetaOnly) {
-      handleMetaSend(template, { stopPropagation: () => {} } as any);
+      handleMetaSyncStatus(template, { stopPropagation: () => { } } as any);
       return;
     }
 
@@ -893,8 +943,7 @@ export default function TemplatesPage() {
           toast.error(`Failed to send: ${firstError}`);
         } else {
           toast.warning(
-            `${results.length - failed.length} sent, ${
-              failed.length
+            `${results.length - failed.length} sent, ${failed.length
             } failed. First error: ${firstError}`,
           );
         }
@@ -1197,16 +1246,20 @@ export default function TemplatesPage() {
                           <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
                           <div className="bg-white dark:bg-muted rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-none p-3 shadow-sm border border-border/20 text-xs text-foreground/80 leading-relaxed font-sans relative z-10 max-w-[90%] before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-white dark:before:bg-muted before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
-                            {t.languages[0]?.headerType !== "TEXT" && (
-                              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                                {t.languages[0]?.headerType === "IMAGE" ? (
-                                  <ImageIcon className="w-3 h-3" />
-                                ) : (
-                                  <Paperclip className="w-3 h-3" />
-                                )}
-                                {t.languages[0]?.headerType}
-                              </div>
-                            )}
+                            {(t.languages[0]?.headerType !== "TEXT" ||
+                              t.templateType === "catalog" ||
+                              t.templateType === "carousel") && (
+                                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                  {t.languages[0]?.headerType === "IMAGE" ? (
+                                    <ImageIcon className="w-3 h-3" />
+                                  ) : (
+                                    <Paperclip className="w-3 h-3" />
+                                  )}
+                                  {t.languages[0]?.headerType !== "TEXT"
+                                    ? t.languages[0]?.headerType
+                                    : t.templateType}
+                                </div>
+                              )}
                             <p className="line-clamp-4 whitespace-pre-wrap">
                               {t.languages[0]?.body || "No content"}
                             </p>
@@ -1270,7 +1323,7 @@ export default function TemplatesPage() {
                             )}
                             onClick={(e) => {
                               if (t.isMetaOnly) {
-                                handleMetaSend(t, e);
+                                handleMetaSyncStatus(t, e);
                                 return;
                               }
 
@@ -1286,9 +1339,12 @@ export default function TemplatesPage() {
                             disabled={!!syncing || !!submitting || !!importing}
                           >
                             {syncing === t.id ||
-                            submitting === t.id ||
-                            importing === t.id ? (
+                              syncing === t.metaTemplateName ||
+                              submitting === t.id ||
+                              importing === t.id ? (
                               <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
+                            ) : t.isMetaOnly ? (
+                              <RefreshCw className="w-3 h-3 mr-1.5" />
                             ) : t.status === "draft" ? (
                               <Upload className="w-3 h-3 mr-1.5" />
                             ) : t.status === "approved" ? (
@@ -1296,13 +1352,15 @@ export default function TemplatesPage() {
                             ) : (
                               <RefreshCw className="w-3 h-3 mr-1.5" />
                             )}
-                            {t.status === "draft"
-                              ? "Submit"
-                              : t.status === "approved"
-                                ? importing === t.id
-                                  ? "Preparing..."
-                                  : "Send"
-                                : "Sync"}
+                            {t.isMetaOnly
+                              ? "Status"
+                              : t.status === "draft"
+                                ? "Submit"
+                                : t.status === "approved"
+                                  ? importing === t.id
+                                    ? "Preparing..."
+                                    : "Send"
+                                  : "Sync"}
                           </Button>
                           <div className="w-px h-4 bg-border/60"></div>
                           <Button
@@ -1482,8 +1540,8 @@ export default function TemplatesPage() {
                       Preview
                     </label>
                     {selectedTemplate.templateType === "carousel" &&
-                    selectedTemplate.carouselCards &&
-                    selectedTemplate.carouselCards.length > 0 ? (
+                      selectedTemplate.carouselCards &&
+                      selectedTemplate.carouselCards.length > 0 ? (
                       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x px-1">
                         {selectedTemplate.carouselCards.map(
                           (card: any, idx: number) => (
@@ -1531,14 +1589,14 @@ export default function TemplatesPage() {
                               {/* Card Buttons */}
                               {(card.buttonText ||
                                 (card.buttons && card.buttons.length > 0)) && (
-                                <div className="px-3 pb-3 pt-0">
-                                  <div className="w-full py-1.5 rounded bg-primary/5 text-primary text-[10px] font-medium text-center border border-primary/10">
-                                    {card.buttonText ||
-                                      card.buttons?.[0]?.text ||
-                                      "View"}
+                                  <div className="px-3 pb-3 pt-0">
+                                    <div className="w-full py-1.5 rounded bg-primary/5 text-primary text-[10px] font-medium text-center border border-primary/10">
+                                      {card.buttonText ||
+                                        card.buttons?.[0]?.text ||
+                                        "View"}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
                             </div>
                           ),
                         )}
@@ -1799,7 +1857,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               ).length > 0 &&
                               leads
                                 .filter(
@@ -1817,7 +1875,7 @@ export default function TemplatesPage() {
                                       l.category_name === selectedCategory) &&
                                     (!selectedSubCategory ||
                                       l.sub_category_name ===
-                                        selectedSubCategory),
+                                      selectedSubCategory),
                                 )
                                 .every((l) =>
                                   recipientList.includes(l.mobile_number),
@@ -1835,7 +1893,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               );
                               const allSelected = filtered.every((l) =>
                                 recipientList.includes(l.mobile_number),
@@ -1877,7 +1935,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               ).length
                             }
                             )
@@ -1925,7 +1983,7 @@ export default function TemplatesPage() {
                                 checked={recipientList.includes(
                                   lead.mobile_number,
                                 )}
-                                onChange={() => {}} // handled by parent div click
+                                onChange={() => { }} // handled by parent div click
                                 className="pointer-events-none"
                               />
                               <div className="flex flex-col">
@@ -2406,19 +2464,19 @@ export default function TemplatesPage() {
                               />
                               {(btn.type === "URL" ||
                                 btn.type === "PHONE_NUMBER") && (
-                                <Input
-                                  className="h-8 text-sm"
-                                  placeholder={
-                                    btn.type === "URL"
-                                      ? "https://website.com"
-                                      : "+1234567890"
-                                  }
-                                  value={btn.value}
-                                  onChange={(e) =>
-                                    updateButton(idx, "value", e.target.value)
-                                  }
-                                />
-                              )}
+                                  <Input
+                                    className="h-8 text-sm"
+                                    placeholder={
+                                      btn.type === "URL"
+                                        ? "https://website.com"
+                                        : "+1234567890"
+                                    }
+                                    value={btn.value}
+                                    onChange={(e) =>
+                                      updateButton(idx, "value", e.target.value)
+                                    }
+                                  />
+                                )}
 
                               {btn.type === "FLOW" && (
                                 <div className="flex flex-col gap-2 mt-2">
@@ -2447,10 +2505,10 @@ export default function TemplatesPage() {
                                           if ((flow as any).flowJson) {
                                             const json =
                                               typeof (flow as any).flowJson ===
-                                              "string"
+                                                "string"
                                                 ? JSON.parse(
-                                                    (flow as any).flowJson,
-                                                  )
+                                                  (flow as any).flowJson,
+                                                )
                                                 : (flow as any).flowJson;
 
                                             if (
@@ -2566,34 +2624,34 @@ export default function TemplatesPage() {
                             {/* Header Media */}
                             {(formData.headerType === "IMAGE" ||
                               formData.headerType === "VIDEO") && (
-                              <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
-                                {headerPreview ? (
-                                  formData.headerType === "VIDEO" ? (
-                                    <video
-                                      src={headerPreview}
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    <img
-                                      src={headerPreview}
-                                      alt="Header"
-                                      className="w-full h-full object-contain"
-                                    />
-                                  )
-                                ) : (
-                                  <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
-                                    {formData.headerType === "IMAGE" ? (
-                                      <ImageIcon className="w-6 h-6" />
+                                <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
+                                  {headerPreview ? (
+                                    formData.headerType === "VIDEO" ? (
+                                      <video
+                                        src={headerPreview}
+                                        className="w-full h-full object-contain"
+                                      />
                                     ) : (
-                                      <Video className="w-6 h-6" />
-                                    )}
-                                    <span className="text-[8px] font-bold uppercase">
-                                      {formData.headerType}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                      <img
+                                        src={headerPreview}
+                                        alt="Header"
+                                        className="w-full h-full object-contain"
+                                      />
+                                    )
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
+                                      {formData.headerType === "IMAGE" ? (
+                                        <ImageIcon className="w-6 h-6" />
+                                      ) : (
+                                        <Video className="w-6 h-6" />
+                                      )}
+                                      <span className="text-[8px] font-bold uppercase">
+                                        {formData.headerType}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
 
                             {/* Header Text */}
                             {formData.headerType === "TEXT" &&
