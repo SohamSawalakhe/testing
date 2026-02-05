@@ -23,6 +23,7 @@ interface Props {
   onReply: (message: Message) => void;
   setInputValue: (v: string) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  shouldAnimate?: boolean;
 }
 
 // Audio Player Component
@@ -115,8 +116,8 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
                 <div
                   key={i}
                   className={`flex-1 rounded-full transition-all ${isFilled
-                    ? "bg-primary"
-                    : "bg-primary/30 hover:bg-primary/40"
+                      ? "bg-primary"
+                      : "bg-primary/30 hover:bg-primary/40"
                     }`}
                   style={{ height: `${height * 3}px`, minWidth: "2px" }}
                 />
@@ -157,6 +158,7 @@ export default function MessageBubble({
   onReply,
   setInputValue,
   inputRef,
+  shouldAnimate = false,
 }: Props) {
   // Prioritize finding the full message from history.
   // If not found, fall back to the snapshot in `msg.replyTo` but cast/shape it as a Message.
@@ -248,8 +250,8 @@ export default function MessageBubble({
     <div className={`flex items-center gap-0.5 select-none ${customClass}`}>
       <span
         className={`text-[10px] lowercase leading-none ${isOverlay
-          ? "text-white drop-shadow-sm font-medium"
-          : "text-muted-foreground/60"
+            ? "text-white drop-shadow-sm font-medium"
+            : "text-muted-foreground/60"
           }`}
       >
         {formattedTime}
@@ -272,7 +274,7 @@ export default function MessageBubble({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      initial={shouldAnimate ? { opacity: 0, y: 20, scale: 0.95 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       className={`flex items-end gap-2 ${msg.sender === "executive" ? "justify-end" : "justify-start"
         }`}
@@ -614,8 +616,8 @@ export default function MessageBubble({
                 <button
                   key={idx}
                   className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${msg.sender === "executive"
-                    ? "bg-wa-outbound"
-                    : "bg-wa-inbound"
+                      ? "bg-wa-outbound"
+                      : "bg-wa-inbound"
                     }`}
                   onClick={() => {
                     if (
@@ -670,7 +672,7 @@ export default function MessageBubble({
                 {showNavButtons && (
                   <button
                     className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 shadow-lg flex items-center justify-center transition-all active:scale-95 opacity-0 group-hover/carousel:opacity-100"
-                    onClick={() => scrollCarousel('left')}
+                    onClick={() => scrollCarousel("left")}
                     title="Scroll left"
                   >
                     <svg
@@ -797,21 +799,24 @@ export default function MessageBubble({
           msg.template.catalogProducts.length > 0 && (
             <div className="w-full p-2 bg-wa-inbound rounded-xl border border-border/50 overflow-hidden">
               <div className="grid grid-cols-2 gap-2">
-                {msg.template.catalogProducts
-                  .slice(0, 4)
-                  .map((product, idx) => (
-                    <div
-                      key={idx}
-                      className="aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden group border border-border/20"
-                    >
-                      <ShoppingBag className="w-8 h-8 text-primary/20" />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 backdrop-blur-[2px]">
-                        <div className="text-[10px] text-white truncate font-medium text-center">
-                          {product.productId}
+                {msg.template.catalogProducts.map((prod, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-background rounded-lg p-2 border border-border/50 flex flex-col gap-1"
+                  >
+                    <div className="relative w-full aspect-square bg-muted/20 rounded mb-1">
+                      {prod.retailerProductCode ? (
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                          {/* Placeholder since we don't have catalog image fetcher yet */}
+                          <ShoppingBag className="w-6 h-6 opacity-20" />
                         </div>
-                      </div>
+                      ) : null}
                     </div>
-                  ))}
+                    <div className="font-medium text-xs truncate">
+                      Code: {prod.retailerProductCode}
+                    </div>
+                  </div>
+                ))}
               </div>
               {msg.template.catalogProducts.length > 4 && (
                 <div className="text-center mt-2.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-widest bg-muted/50 py-1 rounded">
