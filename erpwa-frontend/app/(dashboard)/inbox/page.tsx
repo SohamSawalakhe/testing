@@ -3,12 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { processMedia } from "@/lib/mediaProcessor";
 import { motion } from "framer-motion";
-import {
-  Check,
-  CheckCheck,
-  AlertCircle,
-  MessageSquareIcon,
-} from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 import { toast } from "react-toastify";
 import { galleryAPI } from "@/lib/galleryApi";
 import { categoriesAPI } from "@/lib/categoriesApi";
@@ -77,31 +72,6 @@ interface ApiMessage {
 /* =======================
    CONVERSATION LIST (UI UNCHANGED)
 ======================= */
-
-const getConversationTick = (
-  direction?: "inbound" | "outbound",
-  status?: "sent" | "delivered" | "read" | "failed" | "received",
-) => {
-  // 🔒 HARD RULE: ticks ONLY for outbound
-  if (direction !== "outbound") return null;
-
-  const iconClass = "w-4 h-4 flex-shrink-0";
-
-  switch (status) {
-    case "sent":
-      return <Check className={`${iconClass} text-muted-foreground`} />;
-    case "delivered":
-      return <CheckCheck className={`${iconClass} text-muted-foreground`} />;
-    case "read":
-      return <CheckCheck className={`${iconClass} text-blue-500`} />;
-    case "failed":
-      return <AlertCircle className={`${iconClass} text-destructive`} />;
-    case "received":
-      return <CheckCheck className={`${iconClass} text-muted-foreground`} />;
-    default:
-      return null;
-  }
-};
 
 function ChatArea({
   conversation,
@@ -208,7 +178,6 @@ function ChatArea({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const genericInputRef = useRef<HTMLInputElement | null>(null);
   const isSessionActive = conversation.sessionActive !== false;
-  const sessionStarted = conversation.sessionStarted;
 
   useChatSocket({
     conversationId: conversation.id,
@@ -462,17 +431,6 @@ function ChatArea({
     }
   };
 
-  const getMessageStatusIcon = (status?: string) => {
-    if (!status) return null;
-    if (status === "sent") return <Check className="w-4 h-4" />;
-    if (status === "delivered") return <CheckCheck className="w-4 h-4" />;
-    if (status === "read")
-      return <CheckCheck className="w-4 h-4 text-blue-500" />;
-    if (status === "failed")
-      return <AlertCircle className="w-4 h-4 text-destructive" />;
-    return null;
-  };
-
   useEffect(() => {
     if (!conversation.sessionActive || !conversation.sessionExpiresAt) {
       setRemainingTime(null);
@@ -538,80 +496,6 @@ function ChatArea({
     } finally {
       setSending(false);
     }
-  };
-
-  const getDateLabel = (iso: string) => {
-    const msgDate = new Date(iso);
-    const today = new Date();
-    const yesterday = new Date();
-
-    yesterday.setDate(today.getDate() - 1);
-
-    if (msgDate.toDateString() === today.toDateString()) {
-      return "Today";
-    }
-
-    if (msgDate.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
-    }
-
-    return msgDate.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const isNewDay = (a: string, b: string) =>
-    new Date(a).toDateString() !== new Date(b).toDateString();
-
-  const getReplyPreview = (m?: Message | Message["replyTo"]) => {
-    if (!m) return null;
-
-    // TEXT
-    if (m.text) {
-      return {
-        type: "text",
-        title: m.sender === "executive" ? "You" : conversation.companyName,
-        subtitle: m.text,
-      };
-    }
-
-    // IMAGE
-    if (m.mimeType?.startsWith("image/")) {
-      return {
-        type: "image",
-        title: m.sender === "executive" ? "You" : conversation.companyName,
-        subtitle: "Photo",
-        thumb: m.mediaUrl,
-      };
-    }
-
-    // VIDEO
-    if (m.mimeType?.startsWith("video/")) {
-      return {
-        type: "video",
-        title: m.sender === "executive" ? "You" : conversation.companyName,
-        subtitle: "Video",
-        thumb: m.mediaUrl,
-      };
-    }
-
-    // AUDIO
-    if (m.mimeType?.startsWith("audio/")) {
-      return {
-        type: "audio",
-        title: m.sender === "executive" ? "You" : conversation.companyName,
-        subtitle: "Voice message",
-      };
-    }
-
-    // DOCUMENT
-    return {
-      type: "document",
-      title: m.sender === "executive" ? "You" : conversation.companyName,
-      subtitle: "Document",
-    };
   };
 
   return (
@@ -775,65 +659,6 @@ function ChatArea({
         onSend={sendImageFromPreview}
       />
     </div>
-  );
-}
-
-function ActionButton({
-  label,
-  onClick,
-  disabled,
-  destructive,
-}: {
-  label: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  destructive?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors
-        ${destructive ? "text-destructive" : "text-foreground"}
-        ${disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-muted"}
-      `}
-    >
-      {label}
-    </button>
-  );
-}
-function AttachItem({
-  icon,
-  label,
-  color,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  color: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="
-        w-full flex items-center gap-4
-        px-4 py-2
-        text-sm
-        text-white
-        hover:bg-white/10
-        transition-colors
-      "
-    >
-      <div
-        className="w-9 h-9 rounded-full flex items-center justify-center text-white"
-        style={{ backgroundColor: color }}
-      >
-        {icon}
-      </div>
-
-      <span className="font-normal">{label}</span>
-    </button>
   );
 }
 
@@ -1064,12 +889,28 @@ export default function InboxPage() {
   };
 
   useEffect(() => {
-    loadInbox();
-    if (chatId) {
-      readSentRef.current.delete(chatId);
-      fetchConversationData(chatId);
-    }
+    const initInbox = async () => {
+      await loadInbox();
+    };
+    initInbox();
   }, []);
+
+  useEffect(() => {
+    if (chatId) {
+      const loadMsg = async () => {
+        // Yield to avoid synchronous state updates during effect execution
+        await Promise.resolve();
+
+        setSelectedConversation(chatId);
+        setShowChat(true);
+        setMessages([]);
+        readSentRef.current.delete(chatId);
+
+        await fetchConversationData(chatId);
+      };
+      loadMsg();
+    }
+  }, [chatId]);
 
   const currentConversation = conversations.find(
     (c) => c.id === selectedConversation,
@@ -1080,7 +921,7 @@ export default function InboxPage() {
       <div
         className={`${
           showChat ? "hidden md:block" : "block"
-        } w-full md:w-auto h-full flex-shrink-0`}
+        } w-full md:w-auto h-full shrink-0`}
       >
         <ConversationList
           conversations={conversations}
