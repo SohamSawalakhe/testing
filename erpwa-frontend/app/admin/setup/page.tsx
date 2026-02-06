@@ -31,6 +31,11 @@ export default function WhatsAppSetupPage() {
     whatsappAccessToken: "",
   });
 
+  const [embeddedSession, setEmbeddedSession] = useState<{
+    whatsappBusinessId: string;
+    whatsappPhoneNumberId: string;
+  } | null>(null);
+
   /* ================= CONFIRM TOAST ================= */
 
   function showConfirmToast(options: {
@@ -68,6 +73,47 @@ export default function WhatsAppSetupPage() {
       { autoClose: false, closeOnClick: false },
     );
   }
+
+  useEffect(() => {
+    if (window.FB) return;
+
+    window.fbAsyncInit = function () {
+      window.FB.init({
+        appId: process.env.NEXT_PUBLIC_META_APP_ID!,
+        xfbml: false,
+        version: "v24.0",
+      });
+    };
+
+    const script = document.createElement("script");
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.facebook.com" &&
+        event.origin !== "https://web.facebook.com"
+      )
+        return;
+
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
+          setEmbeddedSession({
+            whatsappBusinessId: data.data.waba_id,
+            whatsappPhoneNumberId: data.data.phone_number_id,
+          });
+        }
+      } catch {}
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   /* ================= LOAD STATUS ================= */
 
@@ -135,77 +181,60 @@ export default function WhatsAppSetupPage() {
 
   /* ================= EMBEDDED SIGNUP ================= */
 
-  async function handleEmbeddedSignup() {
-    try {
-      // Get the embedded signup URL from backend
-      const res = await api.get("/vendor/whatsapp/embedded-signup-url");
-      const { signupUrl } = res.data;
+  function handleEmbeddedSignup() {
+    if (!window.FB) {
+      toast.error("Facebook SDK not loaded");
+      return;
+    }
 
-      // Open Meta's embedded signup in a popup
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
+    setSaving(true);
+    setError(null);
 
-      const popup = window.open(
-        signupUrl,
-        "MetaEmbeddedSignup",
-        `width=${width},height=${height},left=${left},top=${top}`,
-      );
-
-      // Listen for the OAuth callback
-      const handleMessage = async (event: MessageEvent) => {
-        // Verify origin for security
-        if (event.origin !== window.location.origin) return;
-
-        if (event.data.type === "whatsapp-embedded-signup") {
-          const { code } = event.data;
-
-          if (code) {
-            setSaving(true);
-            try {
-              // Exchange code for access token and complete setup
-              await api.post("/vendor/whatsapp/embedded-setup", { code });
-              const res = await api.get("/vendor/whatsapp");
-
-              setConfig(res.data);
-              setStatus("connected");
-              toast.success(
-                "WhatsApp connected successfully via embedded signup!",
-              );
-            } catch (err: any) {
-              setStatus("error");
-              const error = err as {
-                response?: { data?: { message?: string } };
-              };
-              setError(
-                error.response?.data?.message || "Embedded setup failed",
-              );
-            } finally {
-              setSaving(false);
-            }
+    window.FB.login(
+      (response: any) => {
+        // 👇 wrap async logic inside
+        (async () => {
+          if (!response.authResponse) {
+            setSaving(false);
+            toast.error("Signup cancelled");
+            return;
           }
 
-          popup?.close();
-          window.removeEventListener("message", handleMessage);
-        }
-      };
+          const code = response.authResponse.code;
+          const session = embeddedSession;
 
-      window.addEventListener("message", handleMessage);
+          if (!session?.whatsappBusinessId || !session?.whatsappPhoneNumberId) {
+            setSaving(false);
+            setError("Failed to receive WhatsApp account details from Meta");
+            return;
+          }
 
-      // Clean up if popup is closed manually
-      const checkPopup = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkPopup);
-          window.removeEventListener("message", handleMessage);
-        }
-      }, 500);
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(
-        error.response?.data?.message || "Failed to initiate embedded signup",
-      );
-    }
+          try {
+            await api.post("/vendor/whatsapp/embedded-setup", {
+              code,
+              whatsappBusinessId: session.whatsappBusinessId,
+              whatsappPhoneNumberId: session.whatsappPhoneNumberId,
+            });
+
+            const res = await api.get("/vendor/whatsapp");
+            setConfig(res.data);
+            setStatus("connected");
+            toast.success("WhatsApp connected successfully");
+          } catch (err: any) {
+            setStatus("error");
+            setError(err.response?.data?.message || "Embedded signup failed");
+          } finally {
+            setSaving(false);
+          }
+        })();
+      },
+      {
+        config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID!,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: { version: "v3" },
+      },
+    );
   }
 
   /* ================= GUARDS ================= */
