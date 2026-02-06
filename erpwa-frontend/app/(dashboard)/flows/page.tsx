@@ -88,9 +88,9 @@ const DeleteFlowConfirmation = ({ closeToast, onConfirm, flowName }: any) => {
                     </div>
                 </div>
                 <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-base text-slate-100">Delete Flow?</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed mt-1">
-                        Are you sure you want to delete <span className="font-bold text-slate-200 underline decoration-red-500/30">"{flowName}"</span>? This action cannot be undone.
+                    <h3 className="font-extrabold text-base text-foreground">Delete Flow?</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                        Are you sure you want to delete <span className="font-bold text-foreground underline decoration-red-500/30">"{flowName}"</span>? This action cannot be undone.
                     </p>
                 </div>
             </div>
@@ -99,7 +99,7 @@ const DeleteFlowConfirmation = ({ closeToast, onConfirm, flowName }: any) => {
                 "border rounded-xl p-3 transition-all duration-200",
                 deleteResponses 
                     ? "bg-red-500/10 border-red-500/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
-                    : "bg-slate-800/40 border-slate-700/50"
+                    : "bg-muted/30 border-border/50"
             )}>
                 <div 
                     className="flex items-center gap-3 cursor-pointer select-none group" 
@@ -109,19 +109,19 @@ const DeleteFlowConfirmation = ({ closeToast, onConfirm, flowName }: any) => {
                         "w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0",
                         deleteResponses 
                             ? "bg-red-600 border-red-600 shadow-lg shadow-red-900/20" 
-                            : "bg-slate-700 border-slate-600 group-hover:border-red-500/50"
+                            : "bg-background border-input group-hover:border-red-500/50"
                     )}>
                         {deleteResponses && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                     </div>
                     <span className={cn(
                         "text-xs font-bold transition-colors",
-                        deleteResponses ? "text-red-400" : "text-slate-300"
+                        deleteResponses ? "text-red-500" : "text-foreground/80"
                     )}>
                         Delete all collected responses
                     </span>
                 </div>
                 
-                <p className="pl-8 mt-1.5 text-[10px] leading-relaxed text-slate-500 font-medium">
+                <p className="pl-8 mt-1.5 text-[10px] leading-relaxed text-muted-foreground/70 font-medium">
                     {deleteResponses 
                         ? "⚠️ Warning: All user data collected from this flow will be permanently erased." 
                         : "Only the flow structure will be deleted. Responses will still be accessible in the global logs."}
@@ -131,7 +131,7 @@ const DeleteFlowConfirmation = ({ closeToast, onConfirm, flowName }: any) => {
             <div className="flex gap-2 justify-end mt-1">
                 <button
                     onClick={closeToast}
-                    className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-all"
+                    className="px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all"
                 >
                     Cancel
                 </button>

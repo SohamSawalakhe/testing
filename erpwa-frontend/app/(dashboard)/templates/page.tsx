@@ -205,10 +205,10 @@ export default function TemplatesPage() {
       );
 
       // Combine: First show Local, then rest of Meta
-      // Actually user probably wants them sorted by name or creation?
-      // Let's just append Meta ones at the end or mix them.
-      // Merging:
-      const merged = [...localTemplates, ...uniqueMetaTemplates];
+      // Filter out FLOW templates as they belong in the Flow Templates page
+      const merged = [...localTemplates, ...uniqueMetaTemplates].filter(
+        (t: any) => !t.buttons?.some((b: any) => b.type === "FLOW"),
+      );
       setTemplates(merged);
     } catch (error) {
       console.error("Failed to fetch templates", error);
