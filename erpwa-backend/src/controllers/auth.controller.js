@@ -1,9 +1,11 @@
 import * as Auth from "../services/auth/auth.service.js";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  sameSite: "lax",
-  secure: false, // true in production (HTTPS)
+  sameSite: isProduction ? "None" : "Lax",
+  secure: isProduction, // true in production (HTTPS)
   path: "/",
   maxAge: 7 * 24 * 60 * 60 * 1000, // ✅ REQUIRED
 };
@@ -11,19 +13,25 @@ const COOKIE_OPTIONS = {
 /* ================= LOGIN ================= */
 
 export async function login(req, res) {
-  const data = await Auth.login(req.body.email, req.body.password);
+  try {
+    const data = await Auth.login(req.body.email, req.body.password);
 
-  console.log("✅ LOGIN SUCCESS: Setting cookie for user", data.user.email);
-  console.log("Cookie Options:", COOKIE_OPTIONS);
+    console.log("✅ LOGIN SUCCESS: Setting cookie for user", data.user.email);
+    console.log("Cookie Options:", COOKIE_OPTIONS);
 
-  res.cookie("refreshToken", data.refreshToken, COOKIE_OPTIONS).json({
-    accessToken: data.accessToken,
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-      role: data.user.role,
-    },
-  });
+    res.cookie("refreshToken", data.refreshToken, COOKIE_OPTIONS).json({
+      accessToken: data.accessToken,
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        role: data.user.role,
+      },
+    });
+  } catch (err) {
+    console.error("❌ LOGIN ERROR:", err.message);
+    const status = err.message === "Invalid credentials" ? 401 : 500;
+    res.status(status).json({ message: err.message });
+  }
 }
 
 /* ================= REFRESH ================= */
@@ -31,8 +39,16 @@ export async function login(req, res) {
 export async function refresh(req, res) {
   const token = req.cookies?.refreshToken;
 
+  // Debug log for cookies
+  console.log(`🔄 REFRESH REQUEST. Cookie Present: ${!!token}`);
   if (!token) {
-    console.log("❌ REFRESH: No token in cookies", req.cookies);
+    console.log(
+      "❌ REFRESH FAILED: No token in cookies. Cookies received:",
+      Object.keys(req.cookies || {}),
+    );
+  }
+
+  if (!token) {
     res.clearCookie("refreshToken", COOKIE_OPTIONS);
     return res.status(401).json({ message: "No token" });
   }

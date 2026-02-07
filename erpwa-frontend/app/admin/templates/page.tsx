@@ -35,6 +35,8 @@ import {
   ShoppingBag,
   LayoutGrid,
   BookTemplate,
+  Reply,
+  SquareArrowOutUpRight,
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
@@ -96,6 +98,7 @@ type Template = {
   createdByName?: string;
   isMetaOnly?: boolean;
   originalName?: string;
+  carouselCards?: any[];
 };
 
 export default function TemplatesPage() {
@@ -220,12 +223,15 @@ export default function TemplatesPage() {
   const parseMetaTemplate = (metaTpl: any) => {
     try {
       const components = metaTpl.components || [];
-      const bodyComp = components.find((c: any) => c.type === "BODY");
+      const carouselComp = components.find((c: any) => c.type === "CAROUSEL");
+      const bodyComp =
+        components.find((c: any) => c.type === "BODY") ||
+        (carouselComp ? { text: "Carousel Template" } : null);
       const headerComp = components.find((c: any) => c.type === "HEADER");
       const buttonsComp = components.find((c: any) => c.type === "BUTTONS");
 
-      // If no body, skip
-      if (!bodyComp || !bodyComp.text) return null;
+      // If no valid message content, skip
+      if (!bodyComp && !carouselComp) return null;
 
       const buttons =
         buttonsComp?.buttons?.map((b: any) => ({
@@ -236,7 +242,8 @@ export default function TemplatesPage() {
           value: b.url || b.phone_number || "",
         })) || [];
 
-      const headerType = headerComp?.format || "TEXT";
+      const headerType =
+        headerComp?.format || (carouselComp ? "CAROUSEL" : "TEXT");
 
       // Extract header media URL from Meta's example field for preview
       let headerMediaUrl: string | null = null;
@@ -699,7 +706,7 @@ export default function TemplatesPage() {
 
       const newTemplate = res.data;
 
-      // Merge media from the parsed Meta template
+      // Merge media and cards from the parsed Meta template/backend response
       const templateWithMedia = {
         ...newTemplate,
         media:
@@ -725,6 +732,11 @@ export default function TemplatesPage() {
   };
 
   const handleCardClick = (template: Template) => {
+    if (template.isMetaOnly) {
+      handleMetaSend(template, { stopPropagation: () => {} } as any);
+      return;
+    }
+
     if (template.status === "approved") {
       openSendModal(template);
     } else if (template.status === "draft" || template.status === "rejected") {
@@ -1148,13 +1160,23 @@ export default function TemplatesPage() {
                                     variant="outline"
                                     className="text-[10px] px-2 py-0.5 h-6"
                                   >
-                                    {b.type === "QUICK_REPLY"
-                                      ? "Quick Reply"
-                                      : b.type === "URL"
-                                        ? "URL"
-                                        : b.type === "PHONE_NUMBER"
-                                          ? "Phone"
-                                          : b.type}
+                                    {b.type === "QUICK_REPLY" ? (
+                                      <>
+                                        <Reply className="w-3 h-3 mr-1" /> Quick
+                                        Reply
+                                      </>
+                                    ) : b.type === "URL" ? (
+                                      <>
+                                        <SquareArrowOutUpRight className="w-3 h-3 mr-1" />{" "}
+                                        URL
+                                      </>
+                                    ) : b.type === "PHONE_NUMBER" ? (
+                                      <>
+                                        <Phone className="w-3 h-3 mr-1" /> Phone
+                                      </>
+                                    ) : (
+                                      b.type
+                                    )}
                                   </Badge>
                                 ))}
                               </div>
@@ -1187,6 +1209,11 @@ export default function TemplatesPage() {
                                   : "text-muted-foreground bg-muted/30 hover:bg-muted/50",
                             )}
                             onClick={(e) => {
+                              if (t.isMetaOnly) {
+                                handleMetaSend(t, e);
+                                return;
+                              }
+
                               if (t.status === "approved") {
                                 e.stopPropagation();
                                 openSendModal(t);
@@ -1196,9 +1223,11 @@ export default function TemplatesPage() {
                                 handleSyncStatus(t.id, e);
                               }
                             }}
-                            disabled={!!syncing || !!submitting}
+                            disabled={!!syncing || !!submitting || !!importing}
                           >
-                            {syncing === t.id || submitting === t.id ? (
+                            {syncing === t.id ||
+                            submitting === t.id ||
+                            importing === t.id ? (
                               <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
                             ) : t.status === "draft" ? (
                               <Upload className="w-3 h-3 mr-1.5" />
@@ -1210,7 +1239,9 @@ export default function TemplatesPage() {
                             {t.status === "draft"
                               ? "Submit"
                               : t.status === "approved"
-                                ? "Send"
+                                ? importing === t.id
+                                  ? "Preparing..."
+                                  : "Send"
                                 : "Sync"}
                           </Button>
                           <div className="w-px h-4 bg-border/60"></div>
@@ -1457,11 +1488,11 @@ export default function TemplatesPage() {
                         })()}
                       </div>
 
-                      {selectedTemplate.languages[0]?.footerText && (
-                        <p className="mt-3 text-[11px] text-muted-foreground border-t border-border/40 pt-2 italic">
-                          {selectedTemplate.languages[0].footerText}
-                        </p>
-                      )}
+                        {selectedTemplate.languages[0]?.footerText && (
+                          <p className="mt-3 text-[11px] text-muted-foreground border-t border-border/40 pt-2 italic">
+                            {selectedTemplate.languages[0].footerText}
+                          </p>
+                        )}
 
                       {/* Buttons */}
                       {selectedTemplate.buttons &&

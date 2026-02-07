@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const backendUrl =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "") ||
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "")?.replace(/\/$/, "") ||
   "http://localhost:5000";
 
 const nextConfig: NextConfig = {

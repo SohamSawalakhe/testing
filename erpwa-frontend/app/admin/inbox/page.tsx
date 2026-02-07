@@ -132,6 +132,9 @@ function ChatArea({
   onUpdateConversationStatus,
   onMarkAsRead,
   onUpdateLeadStatus,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: {
   conversation: Conversation;
   messages: Message[];
@@ -144,6 +147,9 @@ function ChatArea({
   ) => void;
   onMarkAsRead?: (conversationId: string) => void;
   onUpdateLeadStatus?: (leadId: number, status: string) => Promise<void>;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -513,13 +519,7 @@ function ChatArea({
      (NO UI CHANGE)
   =============================== */
 
-  // 👇 AUTO SCROLL TO BOTTOM (WhatsApp behavior)
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
-    });
-  }, [messages]);
+  // � Scroll logic moved to ChatMessages component for better control
 
   useEffect(() => {
     if (replyTo) {
@@ -669,6 +669,9 @@ function ChatArea({
           onReply={(m) => setReplyTo(m)}
           setInputValue={setInputValue}
           inputRef={inputRef}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={onLoadMore}
         />
       </div>
 
@@ -914,6 +917,9 @@ export default function InboxPage() {
   const readSentRef = useRef<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [assignedLeads, setAssignedLeads] = useState<Lead[]>([]); // ✅ State for assigned leads
 
   const loadInbox = async () => {
@@ -965,7 +971,8 @@ export default function InboxPage() {
     setShowChat(true);
 
     try {
-      const res = await api.get(`/inbox/${id}`);
+      // ✅ Fetch Page 1 with Limit 50
+      const res = await api.get(`/inbox/${id}?page=1&limit=50`);
 
       const mappedMessages: Message[] = res.data.messages.map(
         (m: ApiMessage) => {
@@ -986,14 +993,14 @@ export default function InboxPage() {
             timestamp: m.createdAt,
             status: m.status ?? "delivered",
 
-            // TEMPLATE DATA (Look in outboundPayload.template first, then fallback)
+            // TEMPLATE DATA
             template:
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                  footer: m.outboundPayload.footer,
-                  buttons: m.outboundPayload.buttons,
-                }
+                    footer: m.outboundPayload.footer,
+                    buttons: m.outboundPayload.buttons,
+                  }
                 : undefined),
 
             // ✅ Map outboundPayload for interactive messages
@@ -1004,29 +1011,94 @@ export default function InboxPage() {
       );
 
       setMessages((prev) => {
-        const map = new Map(prev.map((m) => [m.id, m]));
-        mappedMessages.forEach((m) => map.set(m.id, m));
-        return Array.from(map.values()).sort(
+        // Just set mapped messages (sorted)
+        return mappedMessages.sort(
           (a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
         );
       });
 
+      setPage(1);
+      // If we got fewer than 50, no more to load
+      setHasMore(mappedMessages.length >= 50);
+
       setConversations((prev) =>
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              sessionStarted: res.data.sessionStarted,
-              sessionActive: res.data.sessionActive,
-              sessionExpiresAt: res.data.sessionExpiresAt,
-            }
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
             : c,
         ),
       );
     } catch (err) {
       console.error("Failed to load conversation", err);
       setMessages([]);
+    }
+  };
+
+  const handleLoadMoreMessages = async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+
+    try {
+      const nextPage = page + 1;
+      const res = await api.get(
+        `/inbox/${selectedConversation}?page=${nextPage}&limit=50`,
+      );
+      const newMessages = res.data.messages || [];
+
+      if (newMessages.length < 50) {
+        setHasMore(false);
+      }
+
+      const mappedMessages: Message[] = newMessages.map((m: ApiMessage) => {
+        const media = m.media?.[0];
+        return {
+          id: m.id,
+          whatsappMessageId: m.whatsappMessageId,
+          replyToMessageId: m.replyToMessageId,
+          text: m.content,
+          mediaUrl: media?.mediaUrl,
+          mimeType: media?.mimeType,
+          caption: media?.caption,
+          sender: m.direction === "outbound" ? "executive" : "customer",
+          timestamp: m.createdAt,
+          status: m.status ?? "delivered",
+          template:
+            m.outboundPayload?.template ||
+            (m.outboundPayload?.name
+              ? {
+                  footer: m.outboundPayload.footer,
+                  buttons: m.outboundPayload.buttons,
+                }
+              : undefined),
+          outboundPayload: m.outboundPayload,
+          messageType: (m as any).messageType,
+        };
+      });
+
+      setMessages((prev) => {
+        // Combine and sort to be safe
+        const combined = [...mappedMessages, ...prev];
+        // Remove duplicates just in case
+        const unique = Array.from(
+          new Map(combined.map((m) => [m.id, m])).values(),
+        );
+        return unique.sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
+      });
+
+      setPage(nextPage);
+    } catch (err) {
+      console.error("Failed to load more messages", err);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -1086,8 +1158,9 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden overflow-x-hidden bg-background">
       <div
-        className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full flex-shrink-0`}
+        className={`${
+          showChat ? "hidden md:block" : "block"
+        } w-full md:w-auto h-full flex-shrink-0`}
       >
         <ConversationList
           conversations={conversations}
@@ -1102,6 +1175,7 @@ export default function InboxPage() {
       >
         {currentConversation ? (
           <ChatArea
+            key={currentConversation.id}
             conversation={currentConversation}
             messages={messages}
             setMessages={setMessages}
@@ -1110,6 +1184,9 @@ export default function InboxPage() {
             onUpdateConversationStatus={handleUpdateConversationStatus}
             onMarkAsRead={handleMarkAsRead}
             onUpdateLeadStatus={handleUpdateLeadStatus}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            onLoadMore={handleLoadMoreMessages}
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-muted/10">

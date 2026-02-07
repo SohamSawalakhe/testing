@@ -33,9 +33,15 @@ api.interceptors.request.use(
     if (accessToken && config.headers && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
+
+    // Bypass ngrok browser warning
+    if (config.headers) {
+      config.headers["ngrok-skip-browser-warning"] = "true";
+    }
+
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 /* ================= REFRESH QUEUE ================= */
@@ -100,7 +106,7 @@ api.interceptors.response.use(
 
       try {
         const res = await refreshApi.post<{ accessToken: string }>(
-          "/auth/refresh"
+          "/auth/refresh",
         );
 
         const newToken = res.data.accessToken;
@@ -129,7 +135,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

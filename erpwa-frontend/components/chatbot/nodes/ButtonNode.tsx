@@ -8,20 +8,36 @@ import {
   Plus,
   GripVertical,
   Disc,
-  Link,
   Phone,
-  MessageCircle,
+  SquareArrowOutUpRight,
   AlertTriangle,
   X,
+  Copy,
+  Reply,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/card";
 import { Button } from "@/components/button";
 
-const ButtonNode = ({ id, data, selected }: NodeProps) => {
-  const { setNodes } = useReactFlow();
+interface ButtonData {
+  id?: string;
+  text: string;
+  type?: "reply" | "url" | "phone_number";
+  value?: string;
+}
+
+interface ButtonNodeData {
+  label?: string;
+  buttons?: ButtonData[];
+}
+
+const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
+  const { setNodes, getNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [localData, setLocalData] = useState({
+  const [localData, setLocalData] = useState<{
+    label: string;
+    buttons: ButtonData[];
+  }>({
     label: data.label || "Buttons Message",
     buttons: data.buttons || [],
   });
@@ -34,6 +50,33 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
     setNodes((nds) => nds.filter((node) => node.id !== id));
     setShowDeleteModal(false);
     toast.success("Button node deleted");
+  };
+
+  const handleCopy = () => {
+    const currentNode = getNodes().find((node) => node.id === id);
+
+    if (!currentNode) return;
+
+    const newNode = {
+      ...currentNode,
+      id: `node_${Math.random().toString(36).substr(2, 9)}`,
+      position: {
+        x: currentNode.position.x + 50,
+        y: currentNode.position.y + 50,
+      },
+      data: {
+        ...currentNode.data,
+        label: localData.label,
+        buttons: localData.buttons.map((btn) => ({
+          ...btn,
+          id: Date.now().toString() + Math.random(),
+        })),
+      },
+      selected: false,
+    };
+
+    setNodes((nds) => [...nds, newNode]);
+    toast.success("Button node copied");
   };
 
   const handleSave = () => {
@@ -120,15 +163,23 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
           </div>
           <div className="flex items-center gap-1 text-gray-400">
             <button
+              onClick={handleCopy}
+              className="p-1 px-2 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+              title="Copy node"
+            >
+              <Copy size={14} />
+            </button>
+            <button
               onClick={handleDeleteClick}
               className="p-1 px-2 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+              title="Delete node"
             >
               <Trash2 size={14} />
             </button>
           </div>
         </div>
 
-        <div className="p-3 bg-white dark:bg-slate-800 space-y-3">
+        <div className="p-3 space-y-3">
           {isEditing ? (
             <div className="space-y-3 nodrag">
               <input
@@ -145,7 +196,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
                 <label className="text-[10px] font-bold text-gray-400 uppercase">
                   Buttons ({localData.buttons.length}/3)
                 </label>
-                {localData.buttons.map((btn: any, idx: number) => (
+                {localData.buttons.map((btn, idx) => (
                   <div
                     key={idx}
                     className="space-y-2 bg-gray-50 dark:bg-slate-900 p-2 rounded-md border border-gray-100 dark:border-slate-700"
@@ -155,7 +206,10 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
                       <select
                         value={btn.type || "reply"}
                         onChange={(e) =>
-                          updateButtonType(idx, e.target.value as any)
+                          updateButtonType(
+                            idx,
+                            e.target.value as "reply" | "url" | "phone_number",
+                          )
                         }
                         className="text-[10px] bg-white dark:bg-slate-800 dark:text-gray-200 border border-gray-200 dark:border-slate-600 rounded px-1 py-1 focus:ring-1 focus:ring-orange-500 outline-none"
                       >
@@ -180,7 +234,10 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
 
                     {btn.type === "url" && (
                       <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1">
-                        <Link size={10} className="text-gray-400" />
+                        <SquareArrowOutUpRight
+                          size={10}
+                          className="text-gray-400"
+                        />
                         <input
                           value={btn.value || ""}
                           onChange={(e) =>
@@ -234,7 +291,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
               </div>
 
               <div className="space-y-1.5 mt-2">
-                {data.buttons?.map((btn: any, idx: number) => {
+                {data.buttons?.map((btn, idx) => {
                   const isUrl = btn.type === "url";
                   const isPhone = btn.type === "phone_number";
                   const LinkComponent = isUrl || isPhone ? "a" : "div";
@@ -261,12 +318,17 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
                         }
                       }}
                     >
-                      {isUrl && <Link size={10} className="text-blue-500" />}
+                      {isUrl && (
+                        <SquareArrowOutUpRight
+                          size={14}
+                          className="text-blue-500"
+                        />
+                      )}
                       {isPhone && (
-                        <Phone size={10} className="text-green-500" />
+                        <Phone size={14} className="text-green-500" />
                       )}
                       {(!btn.type || btn.type === "reply") && (
-                        <MessageCircle size={10} className="text-gray-400" />
+                        <Reply size={14} className="text-gray-400" />
                       )}
                       <span>{btn.text}</span>
 
@@ -302,11 +364,13 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
           className="w-3 h-3 bg-gray-400 border-2 border-white dark:border-slate-900 shadow-sm z-20"
         />
 
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="w-3 h-3 bg-orange-500 border-2 border-white dark:border-slate-900 shadow-sm z-20"
-        />
+        {(!data.buttons || data.buttons.length === 0) && (
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            className="w-3 h-3 bg-orange-500 border-2 border-white dark:border-slate-900 shadow-sm z-20"
+          />
+        )}
       </div>
 
       {showDeleteModal &&

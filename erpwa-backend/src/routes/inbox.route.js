@@ -40,6 +40,7 @@ router.get(
             id: true,
             phoneNumber: true,
             companyName: true,
+            salesPersonId: true,
           },
         },
         messages: {
@@ -95,11 +96,35 @@ router.get(
     const { conversationId } = req.params;
     const vendorId = req.user.vendorId;
 
+    // Pagination params
+    const page = parseInt(req.query.page) || null;
+    const limit = parseInt(req.query.limit) || 50;
+
     const where = {
       id: conversationId,
       vendorId,
       channel: "whatsapp",
     };
+
+    let messagesQuery = {
+      include: {
+        media: true,
+      },
+    };
+
+    if (page) {
+      messagesQuery = {
+        ...messagesQuery,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: (page - 1) * limit,
+      };
+    } else {
+      messagesQuery = {
+        ...messagesQuery,
+        orderBy: { createdAt: "asc" },
+      };
+    }
 
     // 1️⃣ Fetch conversation WITHOUT role restrictions first
     const conversation = await prisma.conversation.findFirst({
@@ -113,12 +138,7 @@ router.get(
             salesPersonId: true, // ✅ Ensure we select this for checking
           },
         },
-        messages: {
-          orderBy: { createdAt: "asc" },
-          include: {
-            media: true,
-          },
-        },
+        messages: messagesQuery,
       },
     });
 
@@ -126,6 +146,11 @@ router.get(
       return res.status(404).json({
         message: "Conversation not found",
       });
+    }
+
+    // If using pagination, we fetched DESC to get latest. Reverse to show ASC.
+    if (conversation && page) {
+      conversation.messages = conversation.messages.reverse();
     }
 
     // 2️⃣ Manually validate Sales permissions
