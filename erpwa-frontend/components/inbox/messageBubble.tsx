@@ -59,7 +59,7 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 min-w-[250px]">
+    <div className="flex items-center gap-2 px-3 py-2 min-w-62.5">
       {/* Play/Pause Button */}
       <button
         onClick={togglePlay}
@@ -266,7 +266,7 @@ export default function MessageBubble({
         className={`flex flex-col gap-1
         ${(isImage || isVideo) ? 'w-fit' :
             (msg.template?.header?.type === 'IMAGE' || msg.template?.header?.type === 'VIDEO')
-              ? 'w-fit max-w-[280px]'
+              ? 'w-fit max-w-70'
               : 'max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]'}
         ${msg.outboundPayload?.interactive || msg.template?.buttons
             ? "min-w-[200px]"
@@ -310,7 +310,7 @@ export default function MessageBubble({
                   <video
                     src={msg.template.header.mediaUrl}
                     controls
-                    className="w-full h-[180px] object-cover"
+                    className="w-full h-45 object-cover"
                   />
                 )}
               {msg.template.header.type === "DOCUMENT" &&
@@ -352,7 +352,7 @@ export default function MessageBubble({
           <div className={`flex flex-col ${!isImage && !isVideo ? 'p-1 gap-1' : ''}`}>
             {/* IMAGE MESSAGE - WhatsApp Style */}
             {isImage && effectiveMediaUrl && (
-              <div className="w-fit max-w-[300px]">
+              <div className="w-fit max-w-75">
                 {/* Image container with padding to create border effect */}
                 <div className="p-1">
                   <img
@@ -389,7 +389,7 @@ export default function MessageBubble({
 
             {/* VIDEO MESSAGE - WhatsApp Style */}
             {isVideo && effectiveMediaUrl && (
-              <div className="w-fit max-w-[300px]">
+              <div className="w-fit max-w-75">
                 {/* Video container with padding to create border effect */}
                 <div className="p-1">
                   <video
@@ -682,7 +682,7 @@ export default function MessageBubble({
                     {cards.map((card, idx) => (
                       <div
                         key={idx}
-                        className="shrink-0 w-[205px] snap-start flex flex-col gap-1"
+                        className="shrink-0 w-52 snap-start flex flex-col gap-1"
                       >
                         {/* Card Bubble - Image + Text */}
                         <div className="bg-wa-outbound rounded-lg overflow-hidden">

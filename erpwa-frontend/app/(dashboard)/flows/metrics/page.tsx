@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     BarChart3,
@@ -15,41 +15,38 @@ import {
 import api from "@/lib/api";
 import { toast } from "react-toastify";
 
+interface Flow {
+    id: string;
+    name: string;
+    status: string;
+}
+
+interface Metrics {
+    totalResponses: number;
+    completedResponses: number;
+    abandonedResponses: number;
+    completionRate: number;
+}
+
 function MetricsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const flowIdParam = searchParams.get("flowId");
 
-    const [flows, setFlows] = useState<any[]>([]);
+    const [flows, setFlows] = useState<Flow[]>([]);
     const [selectedFlowId, setSelectedFlowId] = useState<string>(flowIdParam || "all");
-    const [metrics, setMetrics] = useState<any>(null);
+    const [metrics, setMetrics] = useState<Metrics | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadingFlows, setLoadingFlows] = useState(true);
 
-    useEffect(() => {
-        fetchFlows();
-    }, []);
-
-    useEffect(() => {
-        if (selectedFlowId) {
-            fetchMetrics(selectedFlowId);
-            // Update URL without refreshing
-            const url = new URL(window.location.href);
-            url.searchParams.set("flowId", selectedFlowId);
-            window.history.pushState({}, "", url.toString());
-        }
-    }, [selectedFlowId]);
-
-    const fetchFlows = async () => {
+    const fetchFlows = useCallback(async () => {
         try {
             setLoadingFlows(true);
             const response = await api.get("/whatsapp/flows");
             const flowsData = response.data.flows || [];
             setFlows(flowsData);
 
-            // If no flow selected but we have flows, and no param was passed, maybe select the first one?
-            // Or just leave it empty. Let's leave it empty unless param passed.
-            if (flowIdParam && flowsData.find((f: any) => f.id === flowIdParam)) {
+            if (flowIdParam && flowsData.find((f: Flow) => f.id === flowIdParam)) {
                 setSelectedFlowId(flowIdParam);
             }
         } catch (error) {
@@ -58,9 +55,9 @@ function MetricsContent() {
         } finally {
             setLoadingFlows(false);
         }
-    };
+    }, [flowIdParam]);
 
-    const fetchMetrics = async (id: string) => {
+    const fetchMetrics = useCallback(async (id: string) => {
         try {
             setLoading(true);
             const response = await api.get(`/whatsapp/flows/${id}/metrics`);
@@ -72,7 +69,21 @@ function MetricsContent() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchFlows();
+    }, [fetchFlows]);
+
+    useEffect(() => {
+        if (selectedFlowId) {
+            fetchMetrics(selectedFlowId);
+            // Update URL without refreshing
+            const url = new URL(window.location.href);
+            url.searchParams.set("flowId", selectedFlowId);
+            window.history.pushState({}, "", url.toString());
+        }
+    }, [selectedFlowId, fetchMetrics]);
 
     const selectedFlow = flows.find(f => f.id === selectedFlowId);
 
@@ -122,7 +133,7 @@ function MetricsContent() {
                 </div>
 
                 {/* Content */}
-                <div className="bg-card border border-border rounded-xl shadow-sm min-h-[400px] p-6">
+                <div className="bg-card border border-border rounded-xl shadow-sm min-h-100 p-6">
                     {!selectedFlowId ? (
                         <div className="flex flex-col items-center justify-center h-full py-20 text-center">
                             <BarChart3 className="w-16 h-16 text-muted-foreground/30 mb-4" />

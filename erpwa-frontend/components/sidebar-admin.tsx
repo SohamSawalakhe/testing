@@ -122,7 +122,7 @@ export function SidebarAdmin() {
           )}
         >
           <div className="flex items-center justify-center px-2 h-16 border-b border-sidebar-border">
-            <Logo className="h-12 w-full max-w-[220px]" />
+            <Logo className="h-12 w-full max-w-55" />
           </div>
 
           <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
@@ -163,7 +163,7 @@ export function SidebarAdmin() {
             isSidebar={true}
             className={cn(
               "transition-all duration-300",
-              isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-[220px]",
+              isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-55",
             )}
           />
         </div>

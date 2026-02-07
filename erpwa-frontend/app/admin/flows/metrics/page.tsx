@@ -20,9 +20,22 @@ function MetricsContent() {
     const searchParams = useSearchParams();
     const flowIdParam = searchParams.get("flowId");
 
-    const [flows, setFlows] = useState<any[]>([]);
+    interface Flow {
+        id: string;
+        name: string;
+        status: string;
+    }
+
+    interface Metrics {
+        totalResponses: number;
+        completedResponses: number;
+        abandonedResponses: number;
+        completionRate: number;
+    }
+
+    const [flows, setFlows] = useState<Flow[]>([]);
     const [selectedFlowId, setSelectedFlowId] = useState<string>(flowIdParam || "all");
-    const [metrics, setMetrics] = useState<any>(null);
+    const [metrics, setMetrics] = useState<Metrics | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadingFlows, setLoadingFlows] = useState(true);
 
@@ -49,7 +62,7 @@ function MetricsContent() {
 
             // If no flow selected but we have flows, and no param was passed, maybe select the first one?
             // Or just leave it empty. Let's leave it empty unless param passed.
-            if (flowIdParam && flowsData.find((f: any) => f.id === flowIdParam)) {
+            if (flowIdParam && flowsData.find((f: Flow) => f.id === flowIdParam)) {
                 setSelectedFlowId(flowIdParam);
             }
         } catch (error) {
@@ -122,7 +135,7 @@ function MetricsContent() {
                 </div>
 
                 {/* Content */}
-                <div className="bg-card border border-border rounded-xl shadow-sm min-h-[400px] p-6">
+                <div className="bg-card border border-border rounded-xl shadow-sm min-h-100 p-6">
                     {!selectedFlowId ? (
                         <div className="flex flex-col items-center justify-center h-full py-20 text-center">
                             <BarChart3 className="w-16 h-16 text-muted-foreground/30 mb-4" />

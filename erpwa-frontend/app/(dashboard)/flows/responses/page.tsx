@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     ArrowLeft,
     Download,
     Eye,
     FileText,
-    Search,
     Filter,
     X,
     ChevronLeft,
@@ -22,18 +21,42 @@ import { toast } from "react-toastify";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+interface Flow {
+    id: string;
+    name: string;
+    status: string;
+}
+
+interface FlowResponse {
+    id: string;
+    createdAt: string;
+    status: string;
+    responseData: Record<string, unknown>;
+    flow?: {
+        name: string;
+        category: string;
+    };
+    conversation?: {
+        lead?: {
+            phoneNumber?: string;
+            email?: string;
+            companyName?: string;
+        };
+    };
+}
+
 function ResponsesContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const flowIdParam = searchParams.get("flowId");
 
-    const [flows, setFlows] = useState<any[]>([]);
+    const [flows, setFlows] = useState<Flow[]>([]);
     const [selectedFlowId, setSelectedFlowId] = useState<string>(flowIdParam || "all");
     const [loadingFlows, setLoadingFlows] = useState(true);
 
     const [loading, setLoading] = useState(false);
-    const [responses, setResponses] = useState<any[]>([]);
-    const [selectedResponse, setSelectedResponse] = useState<any>(null);
+    const [responses, setResponses] = useState<FlowResponse[]>([]);
+    const [selectedResponse, setSelectedResponse] = useState<FlowResponse | null>(null);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 20,
@@ -42,56 +65,25 @@ function ResponsesContent() {
     });
     const [statusFilter, setStatusFilter] = useState("all");
 
-    useEffect(() => {
-        fetchFlows();
-    }, []);
-
-    useEffect(() => {
-        if (selectedFlowId) {
-            // Update URL
-            const url = new URL(window.location.href);
-            url.searchParams.set("flowId", selectedFlowId);
-            window.history.pushState({}, "", url.toString());
-
-            fetchResponses(1);
-        } else {
-            setResponses([]);
-            setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 });
-        }
-    }, [selectedFlowId, statusFilter]);
-
-    // Add auto-polling every 15 seconds
-    useEffect(() => {
-        let interval: any;
-        if (selectedFlowId && selectedFlowId !== "all" && pagination.page === 1) {
-            interval = setInterval(() => {
-                fetchResponses(1, true); // Silent refresh
-            }, 15000);
-        }
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [selectedFlowId, pagination.page]);
-
-    const fetchFlows = async () => {
+    const fetchFlows = useCallback(async () => {
         try {
             setLoadingFlows(true);
             const response = await api.get("/whatsapp/flows");
             const flowsData = response.data.flows || [];
             setFlows(flowsData);
 
-            if (flowIdParam && flowsData.find((f: any) => f.id === flowIdParam)) {
+            if (flowIdParam && flowsData.find((f: Flow) => f.id === flowIdParam)) {
                 setSelectedFlowId(flowIdParam);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error fetching flows:", error);
             toast.error("Failed to load flows list");
         } finally {
             setLoadingFlows(false);
         }
-    };
+    }, [flowIdParam]);
 
-    const fetchResponses = async (page: number, silent = false) => {
+    const fetchResponses = useCallback(async (page: number, silent = false) => {
         if (!selectedFlowId) return;
 
         try {
@@ -113,14 +105,45 @@ function ResponsesContent() {
                 total: response.data.pagination?.total || 0,
                 totalPages: response.data.pagination?.totalPages || 0
             }));
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error fetching responses:", error);
             if (!silent) toast.error("Failed to load responses");
             if (!silent) setResponses([]); // Only clear if not a silent refresh
         } finally {
             if (!silent) setLoading(false);
         }
-    };
+    }, [selectedFlowId, pagination.limit, statusFilter]);
+
+    useEffect(() => {
+        fetchFlows();
+    }, [fetchFlows]);
+
+    useEffect(() => {
+        if (selectedFlowId) {
+            // Update URL
+            const url = new URL(window.location.href);
+            url.searchParams.set("flowId", selectedFlowId);
+            window.history.pushState({}, "", url.toString());
+
+            fetchResponses(1);
+        } else {
+            setResponses([]);
+            setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 });
+        }
+    }, [selectedFlowId, statusFilter, fetchResponses]);
+
+    // Add auto-polling every 15 seconds
+    useEffect(() => {
+        let interval: NodeJS.Timeout | undefined;
+        if (selectedFlowId && selectedFlowId !== "all" && pagination.page === 1) {
+            interval = setInterval(() => {
+                fetchResponses(1, true); // Silent refresh
+            }, 15000);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [selectedFlowId, pagination.page, fetchResponses]);
 
     const exportResponses = async () => {
         if (!selectedFlowId) return;
@@ -139,7 +162,7 @@ function ResponsesContent() {
             a.download = `flow-responses-${flowName}-${new Date().toISOString().split("T")[0]}.csv`;
             a.click();
             toast.success("Responses exported!");
-        } catch (error) {
+        } catch {
             toast.error("Failed to export responses");
         }
     };
@@ -153,19 +176,19 @@ function ResponsesContent() {
                 toast.success("Response deleted successfully");
                 fetchResponses(pagination.page);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error deleting response:", error);
             toast.error("Failed to delete response");
         }
     };
 
-    const convertToCSV = (data: any[]) => {
+    const convertToCSV = (data: FlowResponse[]) => {
         if (data.length === 0) return "";
         const dynamicKeys = new Set<string>();
         data.forEach(item => {
-            const responseData = item.responseData || {};
-            if (typeof responseData === 'object') {
-                Object.keys(responseData).forEach(key => {
+            const resData = item.responseData || {};
+            if (typeof resData === 'object') {
+                Object.keys(resData).forEach(key => {
                     if (key !== 'flow_token') dynamicKeys.add(key);
                 });
             }
@@ -173,14 +196,14 @@ function ResponsesContent() {
         const sortedKeys = Array.from(dynamicKeys).sort();
         const headers = ["Date", "Phone", "Email", "Company", "Flow", "Category", "Status", ...sortedKeys];
 
-        const escapeCsv = (str: string) => {
+        const escapeCsv = (str: unknown) => {
             if (str == null) return "";
-            if (typeof str === 'object') return `"${String(JSON.stringify(str)).replace(/"/g, '""')}"`;
-            return `"${String(str).replace(/"/g, '""')}"`;
+            if (typeof str === 'object') return `&quot;${String(JSON.stringify(str)).replace(/"/g, '""')}&quot;`;
+            return `&quot;${String(str).replace(/"/g, '""')}&quot;`;
         };
 
-        const rows = data.map((item: any) => {
-            const responseData = item.responseData || {};
+        const rows = data.map((item: FlowResponse) => {
+            const resData = (item.responseData || {}) as Record<string, unknown>;
             const row = [
                 new Date(item.createdAt).toLocaleString(),
                 item.conversation?.lead?.phoneNumber || "",
@@ -191,7 +214,8 @@ function ResponsesContent() {
                 item.status,
             ];
             sortedKeys.forEach(key => {
-                row.push(responseData[key] !== undefined ? responseData[key] : "");
+                const val = resData[key];
+                row.push(val !== undefined && val !== null ? String(val) : "");
             });
             return row;
         });
@@ -277,7 +301,7 @@ function ResponsesContent() {
                 </div>
 
                 {/* Content Table */}
-                <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden min-h-[400px]">
+                <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden min-h-100">
                     {!selectedFlowId ? (
                         <div className="flex flex-col items-center justify-center h-full py-20 text-center">
                             <FileText className="w-16 h-16 text-muted-foreground/30 mb-4" />
@@ -355,7 +379,7 @@ function ResponsesContent() {
                                                             </span>
                                                         </td>
                                                         {fieldColumns.map(field => (
-                                                            <td key={field} className="px-4 py-3 max-w-[200px] truncate text-foreground text-xs">
+                                                            <td key={field} className="px-4 py-3 max-w-50 truncate text-foreground text-xs">
                                                                 {(() => {
                                                                     const val = item.responseData?.[field];
                                                                     return val === undefined || val === null || val === '' ? '—' : (typeof val === 'object' ? JSON.stringify(val) : String(val));
@@ -488,7 +512,7 @@ function ResponsesContent() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border">
-                                                {Object.entries(selectedResponse.responseData || {}).map(([key, value]: [string, any]) => (
+                                                {Object.entries(selectedResponse.responseData || {}).map(([key, value]) => (
                                                     <tr key={key} className="hover:bg-muted/10">
                                                         <td className="px-4 py-3 font-medium text-foreground">{key.replace(/_/g, ' ')}</td>
                                                         <td className="px-4 py-3 text-muted-foreground break-all">

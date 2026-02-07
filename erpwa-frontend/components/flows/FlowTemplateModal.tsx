@@ -4,20 +4,16 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     X,
-    Plus,
     Trash2,
     Loader2,
     Image as ImageIcon,
     Video,
     FileText,
     Eye,
-    Send,
     Layers,
     Globe,
     Phone,
-    CheckCircle,
-    Copy,
-    AlertCircle
+    CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
@@ -41,7 +37,7 @@ interface Props {
     flows: Flow[];
 }
 
-const formatError = (error: any, defaultMsg: string) => {
+const formatError = (error: {response?: {data?: {details?: {error_user_msg?: string; error_user_title?: string; message?: string}; message?: string}}}, defaultMsg: string) => {
     const errorData = error.response?.data;
     let msg = errorData?.details?.error_user_msg || errorData?.details?.message || errorData?.message || defaultMsg;
     const title = errorData?.details?.error_user_title;
@@ -93,19 +89,19 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
             });
             if (template.buttons) {
                 setButtons(
-                    template.buttons.map((b: any) => {
+                    template.buttons.map((b: {type: string; text: string; value?: string; flowId?: string; flowAction?: string; navigateScreen?: string}) => {
                         let navigateScreen = b.navigateScreen || b.value || "";
 
                         // Auto-repair: If flowId exists but screen is missing, try to find default
                         if (b.type === "FLOW" && b.flowId && !navigateScreen) {
-                            const flow = flows.find((f: any) => f.id === b.flowId);
+                            const flow = flows.find((f: Flow) => f.id === b.flowId) as Flow & {flowJson?: string | Record<string, unknown>} | undefined;
                             if (flow) {
                                 try {
-                                    const json = typeof (flow as any).flowJson === 'string' ? JSON.parse((flow as any).flowJson) : (flow as any).flowJson;
-                                    if (json?.screens?.length > 0) {
-                                        navigateScreen = json.screens[0].id;
+                                    const json = typeof flow.flowJson === 'string' ? JSON.parse(flow.flowJson) : flow.flowJson as Record<string, unknown> | undefined;
+                                    if (json?.screens && Array.isArray(json.screens) && json.screens.length > 0) {
+                                        navigateScreen = (json.screens[0] as Record<string, unknown>).id as string;
                                     }
-                                } catch (e) { }
+                                } catch { }
                             }
                         }
 
@@ -140,7 +136,7 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
             setHeaderFile(null);
             setHeaderPreview(null);
         }
-    }, [template, isOpen]);
+    }, [template, isOpen, flows]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -168,14 +164,16 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
 
     const updateButton = (index: number, key: string, val: string) => {
         const newButtons = [...buttons];
-        (newButtons[index] as any)[key] = val;
+        (newButtons[index] as Record<string, string | undefined>)[key] = val;
 
         // Auto-select first screen when Flow changes
         if (key === "flowId") {
             const flow = publishedFlows.find(f => f.id === val);
             if (flow) {
                 try {
-                    const json = typeof (flow as any).flowJson === 'string' ? JSON.parse((flow as any).flowJson) : (flow as any).flowJson;
+                    const json = typeof (flow as Flow & {flowJson?: string | Record<string, unknown>}).flowJson === 'string' 
+                        ? JSON.parse((flow as Flow & {flowJson: string}).flowJson) 
+                        : (flow as Flow & {flowJson?: Record<string, unknown>}).flowJson as Record<string, unknown> | undefined;
                     const screens = json.screens || [];
                     if (screens.length > 0) {
                         newButtons[index].navigateScreen = screens[0].id;
@@ -257,8 +255,8 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
                 try {
                     const { file } = await processMedia(headerFile);
                     data.append("header.file", file);
-                } catch (err: any) {
-                    toast.error(err.message || "Media validation failed");
+                } catch (err) {
+                    toast.error((err as {message?: string}).message || "Media validation failed");
                     setIsCreating(false);
                     return;
                 }
@@ -282,9 +280,9 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
             // Important: Call onSave to refresh the list immediately!
             onSave();
             onClose();
-        } catch (error: any) {
+        } catch (error) {
             console.error("Template Save Error:", error);
-            toast.error(formatError(error, "Failed to save template"));
+            toast.error(formatError(error as {response?: {data?: {details?: {error_user_msg?: string; error_user_title?: string; message?: string}; message?: string}}}, "Failed to save template"));
         } finally {
             setIsCreating(false);
         }
@@ -586,11 +584,13 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
                                                     {/* Screen Selection */}
                                                     {btn.flowId && (() => {
                                                         const flow = publishedFlows.find(f => f.id === btn.flowId);
-                                                        let screens: any[] = [];
+                                                        let screens: Array<Record<string, unknown>> = [];
                                                         try {
-                                                            const json = flow && (typeof (flow as any).flowJson === 'string' ? JSON.parse((flow as any).flowJson) : (flow as any).flowJson);
-                                                            screens = json?.screens || [];
-                                                        } catch (e) { }
+                                                            const json = flow && (typeof (flow as Flow & {flowJson?: string | Record<string, unknown>}).flowJson === 'string' 
+                                                                ? JSON.parse((flow as Flow & {flowJson: string}).flowJson) 
+                                                                : (flow as Flow & {flowJson?: Record<string, unknown>}).flowJson) as Record<string, unknown> | undefined;
+                                                            screens = (Array.isArray(json?.screens) ? json.screens : []) as Array<Record<string, unknown>>;
+                                                        } catch { }
 
                                                         if (screens.length > 0) {
                                                             return (
@@ -602,9 +602,9 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
                                                                         onChange={(e) => updateButton(index, "navigateScreen", e.target.value)}
                                                                     >
                                                                         <option value="">Select Screen</option>
-                                                                        {screens.map((screen: any) => (
-                                                                            <option key={screen.id} value={screen.id}>
-                                                                                {screen.title || screen.id} ({screen.id})
+                                                                        {screens.map((screen: Record<string, unknown>) => (
+                                                                            <option key={String(screen.id)} value={String(screen.id)}>
+                                                                                {String(screen.title || screen.id)} ({String(screen.id)})
                                                                             </option>
                                                                         ))}
                                                                     </select>
@@ -680,7 +680,7 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
                             <div className="absolute inset-0 pattern-dots opacity-10 pointer-events-none"></div>
 
                             {/* Mobile Frame Container */}
-                            <div className="relative mx-auto w-full max-w-[280px] border-[10px] border-border rounded-[48px] shadow-2xl bg-card transition-all duration-500 overflow-hidden transform lg:scale-[1.02] 2xl:scale-105">
+                            <div className="relative mx-auto w-full max-w-70 border-10 border-border rounded-[48px] shadow-2xl bg-card transition-all duration-500 overflow-hidden transform lg:scale-[1.02] 2xl:scale-105">
                                 <div className="h-6 bg-card flex justify-between items-center px-6 pt-3 z-20 relative">
                                     <span className="text-[10px] text-muted-foreground font-semibold">
                                         9:41
@@ -690,8 +690,8 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
                                     </div>
                                 </div>
 
-                                <div className="relative bg-muted/30 p-3 pt-4 min-h-[500px] max-h-[550px] overflow-y-auto custom-scrollbar flex flex-col">
-                                    <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                                <div className="relative bg-muted/30 p-3 pt-4 min-h-125 max-h-137.5 overflow-y-auto custom-scrollbar flex flex-col">
+                                    <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] bg-size-[16px_16px]"></div>
 
                                     <div className="relative z-10 w-full flex flex-col gap-1 mt-1 animate-in fade-in zoom-in-95 duration-500">
                                         <div className="bg-card rounded-2xl rounded-tl-none shadow-lg relative overflow-hidden group border border-border before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-card before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
@@ -699,7 +699,7 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
                                                 {/* Header Media */}
                                                 {(formData.headerType === "IMAGE" ||
                                                     formData.headerType === "VIDEO") && (
-                                                        <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
+                                                        <div className="rounded-xl overflow-hidden bg-muted min-h-35 relative group flex items-center justify-center">
                                                             {headerPreview ? (
                                                                 formData.headerType === "VIDEO" ? (
                                                                     <video
@@ -796,7 +796,7 @@ export default function FlowTemplateModal({ isOpen, onClose, onSave, template, f
                         <Button
                             onClick={handleSubmit}
                             disabled={isCreating}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[150px]"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-37.5"
                         >
                             {isCreating ? (
                                 <Loader2 className="w-4 h-4 animate-spin mr-2" />

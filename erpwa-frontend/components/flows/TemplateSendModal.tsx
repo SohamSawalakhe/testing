@@ -1,5 +1,7 @@
 "use client";
 
+
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -30,8 +32,16 @@ interface Props {
     template: Template | null;
 }
 
-const formatError = (error: any, defaultMsg: string) => {
-    const errorData = error.response?.data;
+interface ErrorResponse {
+    message?: string;
+    details?: {
+        error_user_msg?: string;
+        message?: string;
+    };
+}
+
+const formatError = (error: unknown, defaultMsg: string) => {
+    const errorData = (error as { response?: { data?: ErrorResponse } })?.response?.data;
     return errorData?.details?.error_user_msg || errorData?.details?.message || errorData?.message || defaultMsg;
 };
 
@@ -102,7 +112,18 @@ export default function TemplateSendModal({ isOpen, onClose, template }: Props) 
         setSending(true);
         try {
             const hasDynamicVariables = Object.values(variableSources).some(v => v === "company_name");
-            let payload: any = {
+            
+            interface SendTemplatePayload {
+                templateId: string;
+                recipients?: string[];
+                bodyVariables?: string[];
+                customMessages?: Array<{
+                    to: string;
+                    bodyVariables: string[];
+                }>;
+            }
+
+            const payload: SendTemplatePayload = {
                 templateId: template.id,
             };
 
@@ -127,7 +148,7 @@ export default function TemplateSendModal({ isOpen, onClose, template }: Props) 
             const res = await api.post("/vendor/whatsapp/template/send-template", payload);
 
             const results = res.data.results || [];
-            const failed = results.filter((r: any) => !r.success);
+            const failed = results.filter((r: { success: boolean }) => !r.success);
 
             if (failed.length > 0) {
                 const firstError = failed[0].error?.message || "Unknown error";
@@ -140,7 +161,7 @@ export default function TemplateSendModal({ isOpen, onClose, template }: Props) 
                 toast.success("Messages sent successfully!");
                 onClose();
             }
-        } catch (error: any) {
+        } catch (error) {
             toast.error(formatError(error, "Failed to send"));
         } finally {
             setSending(false);
@@ -187,13 +208,19 @@ export default function TemplateSendModal({ isOpen, onClose, template }: Props) 
                                     if (mediaItem?.s3Url) {
                                         if (template.languages?.[0].headerType === "IMAGE") {
                                             return (
-                                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 shadow-md flex items-center justify-center min-h-[140px]">
-                                                    <img src={mediaItem.s3Url} alt="Header" className="w-full h-full object-contain" />
+                                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 shadow-md flex items-center justify-center min-h-[140px] relative w-full h-40">
+                                                    <Image 
+                                                        src={mediaItem.s3Url} 
+                                                        alt="Header" 
+                                                        fill
+                                                        className="object-contain"
+                                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                                    />
                                                 </div>
                                             );
                                         } else if (template.languages?.[0].headerType === "VIDEO") {
                                             return (
-                                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 relative shadow-md flex items-center justify-center min-h-[140px]">
+                                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 relative shadow-md flex items-center justify-center min-h-35">
                                                     <video src={mediaItem.s3Url} className="w-full h-full object-contain" />
                                                     <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                                                         <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white">
@@ -351,7 +378,7 @@ export default function TemplateSendModal({ isOpen, onClose, template }: Props) 
 
                     <div className="p-4 border-t border-border bg-muted/10 flex justify-end gap-3">
                         <Button variant="ghost" onClick={onClose}>Cancel</Button>
-                        <Button onClick={handleSend} disabled={sending} className="bg-green-600 hover:bg-green-700 text-white min-w-[150px]">
+                        <Button onClick={handleSend} disabled={sending} className="bg-green-600 hover:bg-green-700 text-white min-w-37.5">
                             {sending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
                             Send Message
                         </Button>

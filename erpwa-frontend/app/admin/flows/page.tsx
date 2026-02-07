@@ -14,26 +14,16 @@ import {
     Filter,
     Layers,
     CheckCircle2,
-    XCircle,
-    Clock,
     TrendingUp,
     FileText,
     Eye,
     LayoutGrid,
     BookTemplate,
-    Copy,
-    Loader2,
     RefreshCw,
     Upload,
     Paperclip,
     Image as ImageIcon,
-    Video,
-    ShoppingBag,
-    Phone,
-    Globe,
-    MoreVertical,
-    AlertTriangle,
-    Users
+    AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
@@ -42,9 +32,17 @@ import FlowTemplateModal from "@/components/flows/FlowTemplateModal";
 import TemplateSendModal from "@/components/flows/TemplateSendModal";
 import { toast } from "react-toastify";
 import { Template } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
+import { Card, CardContent } from "@/components/card";
 import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
+
+interface ConfirmationToastProps {
+    closeToast?: () => void;
+    message: string;
+    description: string;
+    onConfirm: () => void;
+    confirmLabel?: string;
+}
 
 const ConfirmationToast = ({
     closeToast,
@@ -52,7 +50,7 @@ const ConfirmationToast = ({
     description,
     onConfirm,
     confirmLabel = "Confirm",
-}: any) => (
+}: ConfirmationToastProps) => (
     <div className="flex flex-col gap-2">
         <p className="font-semibold text-sm text-foreground">{message}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
@@ -76,13 +74,19 @@ const ConfirmationToast = ({
     </div>
 );
 
-const DeleteFlowConfirmation = ({ closeToast, onConfirm, flowName }: any) => {
+interface DeleteFlowConfirmationProps {
+    closeToast?: () => void;
+    onConfirm: (deleteResponses: boolean) => void;
+    flowName: string;
+}
+
+const DeleteFlowConfirmation = ({ closeToast, onConfirm, flowName }: DeleteFlowConfirmationProps) => {
     const [deleteResponses, setDeleteResponses] = useState(false);
 
     return (
         <div className="flex flex-col gap-4 p-1">
             <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex-shrink-0">
+                <div className="mt-0.5 shrink-0">
                     <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
                         <AlertTriangle className="w-5 h-5 text-red-500" />
                     </div>
@@ -90,7 +94,7 @@ const DeleteFlowConfirmation = ({ closeToast, onConfirm, flowName }: any) => {
                 <div className="min-w-0 flex-1">
                     <h3 className="font-extrabold text-base text-foreground">Delete Flow?</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-                        Are you sure you want to delete <span className="font-bold text-foreground underline decoration-red-500/30">"{flowName}"</span>? This action cannot be undone.
+                        Are you sure you want to delete <span className="font-bold text-foreground underline decoration-red-500/30">&quot;{flowName}&quot;</span>? This action cannot be undone.
                     </p>
                 </div>
             </div>
@@ -158,6 +162,17 @@ interface Flow {
         responses: number;
         templates: number;
     };
+    flowJson: Record<string, unknown>;
+    validationErrors?: unknown[];
+}
+
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string;
+            validationErrors?: Array<{ error: string }>;
+        };
+    };
 }
 
 export default function FlowsPage() {
@@ -165,7 +180,6 @@ export default function FlowsPage() {
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
     const [templateLoading, setTemplateLoading] = useState(true);
-    const [syncing, setSyncing] = useState(false); // For bulk sync
     const [syncingId, setSyncingId] = useState<string | null>(null); // For individual card sync
     const [submitting, setSubmitting] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -207,7 +221,7 @@ export default function FlowsPage() {
             const response = await api.get("/vendor/templates");
             // Filter templates that have Flow buttons
             const flowTemplates = (response.data || []).filter((t: Template) =>
-                t.buttons?.some((b: any) => b.type === "FLOW")
+                t.buttons?.some((b: { type: string }) => b.type === "FLOW")
             );
             setTemplates(flowTemplates);
         } catch (error) {
@@ -250,8 +264,10 @@ export default function FlowsPage() {
             toast.success("Template submitted to Meta successfully!");
             setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, status: 'pending' } : t));
             fetchTemplates();
-        } catch (error: any) {
-            toast.error(error.response?.data?.message || "Failed to submit template");
+        } catch (error: unknown) {
+            const err = error as ApiError;
+            const message = err.response?.data?.message || "Failed to submit template";
+            toast.error(message);
         } finally {
             setSubmitting(null);
         }
@@ -267,8 +283,10 @@ export default function FlowsPage() {
                 setTemplates(prev => prev.map(t => t.id === id ? { ...t, status: res.data.status } : t));
             }
             fetchTemplates();
-        } catch (error: any) {
-            toast.error(error.response?.data?.message || "Failed to sync status");
+        } catch (error: unknown) {
+            const err = error as ApiError;
+            const message = err.response?.data?.message || "Failed to sync status";
+            toast.error(message);
         } finally {
             setSyncingId(null);
         }
@@ -283,19 +301,7 @@ export default function FlowsPage() {
     };
 
 
-    const handleSyncWithMeta = async () => {
-        try {
-            setSyncing(true);
-            await api.post("/vendor/templates/sync");
-            toast.success("Templates synced with Meta!");
-            fetchTemplates();
-        } catch (error) {
-            console.error("Error syncing templates:", error);
-            toast.error("Failed to sync templates with Meta");
-        } finally {
-            setSyncing(false);
-        }
-    };
+    // Removal of unused handleSyncWithMeta function
 
     const handleDeleteTemplate = async (template: Template, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -310,7 +316,7 @@ export default function FlowsPage() {
                         await api.delete(`/vendor/templates/${template.id}`);
                         toast.success("Template deleted successfully!");
                         setTemplates((prev) => prev.filter((t) => t.id !== template.id));
-                    } catch (error) {
+                    } catch {
                         toast.error("Failed to delete template");
                     } finally {
                         setDeleting(null);
@@ -333,7 +339,7 @@ export default function FlowsPage() {
         try {
             const date = new Date(dateStr);
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } catch (e) {
+        } catch {
             return "12:00";
         }
     };
@@ -354,21 +360,22 @@ export default function FlowsPage() {
                             <div>
                                 <p className="font-semibold">Flow published successfully!</p>
                                 <p className="text-sm mt-1 text-gray-600">
-                                    To send this Flow, go to the "Flow Template" tab, create a new Flow Template with this Flow, and send it to customers.
+                                    To send this Flow, go to the &quot;Flow Template&quot; tab, create a new Flow Template with this Flow, and send it to customers.
                                 </p>
                             </div>,
                             { autoClose: 8000 }
                         );
                         fetchFlows();
-                    } catch (error: any) {
+                    } catch (error: unknown) {
+                        const err = error as ApiError;
                         if (loadingToast) toast.dismiss(loadingToast);
                         const message =
-                            error.response?.data?.message || "Failed to publish Flow";
-                        const validationErrors = error.response?.data?.validationErrors;
+                            err.response?.data?.message || "Failed to publish Flow";
+                        const validationErrors = err.response?.data?.validationErrors;
 
                         if (validationErrors && validationErrors.length > 0) {
                             const errorDetails = validationErrors
-                                .map((e: any) => e.error)
+                                .map((e: { error: string }) => e.error)
                                 .join("\n");
                             toast.error(`Validation Failed:\n${errorDetails}`);
                         } else {
@@ -385,16 +392,18 @@ export default function FlowsPage() {
         toast(
             <ConfirmationToast
                 message="Deprecate this Flow?"
-                description="New templates cannot use it, but existing ones will continue to work."
+                description="This will also DELETE any Flow Templates associated with this flow as they will no longer be usable."
                 confirmLabel="Deprecate"
                 onConfirm={async () => {
                     try {
                         await api.post(`/whatsapp/flows/${flowId}/deprecate`);
-                        toast.success("Flow deprecated");
+                        toast.success("Flow deprecated and associated templates removed");
                         fetchFlows();
-                    } catch (error: any) {
+                        fetchTemplates();
+                    } catch (error: unknown) {
+                        const err = error as ApiError;
                         toast.error(
-                            error.response?.data?.message || "Failed to deprecate Flow",
+                            err.response?.data?.message || "Failed to deprecate Flow",
                         );
                     }
                 }}
@@ -412,9 +421,11 @@ export default function FlowsPage() {
                         await api.delete(`/whatsapp/flows/${flow.id}${deleteResponses ? '?deleteResponses=true' : ''}`);
                         toast.success(`Flow ${deleteResponses ? 'and responses ' : ''}deleted successfully`);
                         fetchFlows();
-                    } catch (error: any) {
+                        fetchTemplates();
+                    } catch (error: unknown) {
+                        const err = error as ApiError;
                         toast.error(
-                            error.response?.data?.message || "Failed to delete Flow",
+                            err.response?.data?.message || "Failed to delete Flow",
                         );
                     }
                 }}
@@ -856,7 +867,7 @@ export default function FlowsPage() {
                                                 )}
                                             >
                                                 {/* Card Header area */}
-                                                <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
+                                                <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-linear-to-b from-muted/30 to-transparent">
                                                     <div className="flex justify-between items-start gap-3">
                                                         <div className="min-w-0 flex-1">
                                                             <h3
@@ -867,7 +878,7 @@ export default function FlowsPage() {
                                                             </h3>
                                                         </div>
                                                         <div className="shrink-0">
-                                                            {getStatusBadge(t.status as any)}
+                                                            {getStatusBadge(t.status)}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
@@ -896,7 +907,7 @@ export default function FlowsPage() {
                                                 <CardContent className="p-0 flex-1 flex flex-col relative bg-muted/5">
                                                     <div className="p-5 flex-1 relative overflow-hidden">
                                                         {/* Subtle background pattern for whatsapp feel */}
-                                                        <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                                                        <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] bg-size-[16px_16px]"></div>
 
                                                         <div className="bg-white dark:bg-muted rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-none p-3 shadow-sm border border-border/20 text-xs text-foreground/80 leading-relaxed font-sans relative z-10 max-w-[90%] before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-white dark:before:bg-muted before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
                                                             {t.languages?.[0]?.headerType !== "TEXT" && (
@@ -993,7 +1004,7 @@ export default function FlowsPage() {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="flex-1 h-8 text-xs font-bold text-red-500/80 bg-red-500/5 hover:text-red-600 hover:bg-red-500/10 transition-all font-bold"
+                                                            className="flex-1 h-8 text-xs font-bold text-red-500/80 bg-red-500/5 hover:text-red-600 hover:bg-red-500/10 transition-all"
                                                             onClick={(e) => handleDeleteTemplate(t, e)}
                                                             disabled={!!deleting}
                                                         >

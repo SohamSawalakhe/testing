@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     ArrowLeft,
     Download,
     Eye,
     FileText,
-    Search,
-    Calendar,
     Filter,
     X,
     ChevronLeft,
@@ -43,13 +41,13 @@ export default function FlowResponsesPage() {
             fetchFlowDetails();
             fetchResponses(1);
         }
-    }, [flowId]);
+    }, [flowId, fetchFlowDetails, fetchResponses]);
 
     useEffect(() => {
         fetchResponses(1);
-    }, [statusFilter]);
+    }, [statusFilter, fetchResponses]);
 
-    const fetchFlowDetails = async () => {
+    const fetchFlowDetails = useCallback(async () => {
         try {
             const response = await api.get(`/whatsapp/flows/${flowId}`);
             if (response.data.success) {
@@ -59,9 +57,9 @@ export default function FlowResponsesPage() {
             console.error("Error fetching flow details:", error);
             toast.error("Failed to load flow details");
         }
-    };
+    }, [flowId]);
 
-    const fetchResponses = async (page: number) => {
+    const fetchResponses = useCallback(async (page: number) => {
         try {
             setLoading(true);
             const queryParams = new URLSearchParams({
@@ -87,7 +85,7 @@ export default function FlowResponsesPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [flowId, pagination.limit, statusFilter]);
 
     const exportResponses = async () => {
         try {
@@ -108,7 +106,7 @@ export default function FlowResponsesPage() {
             a.click();
 
             toast.success("Responses exported!");
-        } catch (error) {
+        } catch {
             toast.error("Failed to export responses");
         }
     };
@@ -332,7 +330,7 @@ export default function FlowResponsesPage() {
                                                                 return (
                                                                     <td
                                                                         key={field}
-                                                                        className="px-4 py-3 max-w-[200px] truncate text-foreground text-xs"
+                                                                        className="px-4 py-3 max-w-50 truncate text-foreground text-xs"
                                                                         title={displayValue}
                                                                     >
                                                                         {displayValue}

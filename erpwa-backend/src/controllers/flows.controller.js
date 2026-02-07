@@ -70,6 +70,71 @@ const sanitizeFlowJson = (json) => {
     }
 };
 
+/**
+ * Helper: Delete all templates associated with a flow
+ * @param {string} flowId - Database Flow ID
+ * @param {string} vendorId - Vendor ID
+ * @param {string} accessToken - Meta access token
+ * @param {string} wabaId - WhatsApp Business Account ID
+ */
+const deleteFlowTemplates = async (flowId, vendorId, accessToken, wabaId) => {
+    try {
+        console.log(`🧹 Cleaning up templates associated with Flow: ${flowId}`);
+        
+        // Find all templates that either reference this flow ID directly 
+        // OR have a button that references this flow
+        const templates = await prisma.template.findMany({
+            where: { 
+                vendorId,
+                OR: [
+                    { flowId: flowId },
+                    { buttons: { some: { flowId: flowId } } }
+                ]
+            }
+        });
+
+        if (templates.length === 0) {
+            console.log('No associated templates found to delete.');
+            return;
+        }
+
+        console.log(`Found ${templates.length} templates to delete`);
+
+        for (const template of templates) {
+            // 1. Delete from Meta if not draft
+            if (template.status !== 'draft') {
+                try {
+                    console.log(`🗑️ Deleting template "${template.metaTemplateName}" from Meta`);
+                    // Use the same version as in FlowsService
+                    await axios.delete(
+                        `https://graph.facebook.com/v21.0/${wabaId}/message_templates?name=${template.metaTemplateName}`,
+                        {
+                            headers: { Authorization: `Bearer ${accessToken}` }
+                        }
+                    );
+                } catch (metaError) {
+                    console.warn(`⚠️ Failed to delete template "${template.metaTemplateName}" from Meta:`, 
+                        metaError.response?.data?.error?.message || metaError.message);
+                }
+            }
+
+            // 2. Clear templateId in campaigns to avoid foreign key errors
+            await prisma.campaign.updateMany({
+                where: { templateId: template.id },
+                data: { templateId: null }
+            });
+
+            // 3. Delete from local DB (cascades to buttons, languages, media)
+            await prisma.template.delete({
+                where: { id: template.id }
+            });
+            console.log(`✅ Deleted template locally: ${template.metaTemplateName}`);
+        }
+    } catch (error) {
+        console.error('❌ Error in deleteFlowTemplates helper:', error);
+    }
+};
+
 export const getFlows = async (req, res) => {
     try {
         const { vendorId } = req.user;
@@ -584,13 +649,20 @@ export const deprecateFlow = async (req, res) => {
         // Get vendor credentials
         const vendor = await prisma.vendor.findUnique({
             where: { id: vendorId },
-            select: { whatsappAccessToken: true }
+            select: { 
+                whatsappAccessToken: true,
+                whatsappBusinessId: true 
+            }
         });
 
         const accessToken = decrypt(vendor.whatsappAccessToken);
 
         // Deprecate in Meta
         await flowsService.deprecateFlow(flow.metaFlowId, accessToken);
+
+        // --- NEW: Delete associated templates ---
+        // Deprecated flows can still be used but user requested cascaded deletion for cleanliness
+        await deleteFlowTemplates(id, vendorId, accessToken, vendor.whatsappBusinessId);
 
         // Update status in database
         const updatedFlow = await prisma.whatsAppFlow.update({
@@ -629,10 +701,18 @@ export const deleteFlow = async (req, res) => {
         // Get vendor credentials
         const vendor = await prisma.vendor.findUnique({
             where: { id: vendorId },
-            select: { whatsappAccessToken: true }
+            select: { 
+                whatsappAccessToken: true,
+                whatsappBusinessId: true 
+            }
         });
 
         const accessToken = decrypt(vendor.whatsappAccessToken);
+
+        // --- NEW: Delete associated templates ---
+        // Templates MUST be deleted before the Flow itself in some Meta scenarios, 
+        // but locally we definitely want them gone.
+        await deleteFlowTemplates(id, vendorId, accessToken, vendor.whatsappBusinessId);
 
         // Delete from Meta
         try {
@@ -745,15 +825,22 @@ export const deleteFlowResponse = async (req, res) => {
         const { vendorId } = req.user;
         const { id: flowId, responseId } = req.params;
 
-        // Verify Flow Response belongs to vendor (via Flow -> Vendor)
-        const response = await prisma.flowResponse.findFirst({
-            where: {
-                id: responseId,
-                flowId: flowId,
-                conversation: {
-                    vendorId
-                }
+        // Create query object
+        const where = {
+            id: responseId,
+            conversation: {
+                vendorId: vendorId // Directly check vendor ID on conversation
             }
+        };
+
+        // If specific flow ID is provided (not 'all'), verify it matches
+        if (flowId !== 'all') {
+            where.flowId = flowId;
+        }
+
+        // Verify Flow Response and find it
+        const response = await prisma.flowResponse.findFirst({
+            where: where
         });
 
         if (!response) {
@@ -915,6 +1002,7 @@ export const setupFlowsEncryption = async (req, res) => {
 };
 
 import { decryptRequest, encryptResponse } from '../utils/flowsCrypto.js';
+import { sendMessage } from '../services/whatsappMessage.service.js';
 
 export const handleFlowEndpoint = async (req, res) => {
     try {
@@ -1075,7 +1163,7 @@ export const handleFlowEndpoint = async (req, res) => {
                     if (flowId) {
                         const flow = await prisma.whatsAppFlow.findUnique({
                             where: { id: flowId },
-                            select: { flowJson: true }
+                            select: { flowJson: true, name: true, category: true }
                         });
 
                         if (flow && flow.flowJson) {
@@ -1195,6 +1283,35 @@ export const handleFlowEndpoint = async (req, res) => {
                             console.log('✅ Flow Response CREATED in DB');
                         }
                         console.log('✅ Flow Response Saved to DB');
+
+                        // --- NEW: Send Confirmation Message on Completion ---
+                        if (status === 'completed') {
+                            try {
+                                console.log("🎉 Flow Completed! Sending confirmation message...");
+                                let confirmationText = "Thank you! Your form response has been received.";
+                                
+                                // Try to get flow details for a better message
+                                if (flowId) {
+                                    const flowDetails = await prisma.whatsAppFlow.findUnique({
+                                        where: { id: flowId },
+                                        select: { name: true, category: true }
+                                    });
+                                    if (flowDetails) {
+                                        const niceCategory = flowDetails.category?.replace(/_/g, ' ').toLowerCase();
+                                        confirmationText = `Thank you! Your ${niceCategory} response has been successfully submitted.`;
+                                    }
+                                }
+
+                                await sendMessage(vendor.id, conversation.id, {
+                                    type: 'text',
+                                    text: confirmationText
+                                });
+                                console.log("✅ Confirmation message sent.");
+                            } catch (msgError) {
+                                console.error("⚠️ Failed to send flow confirmation message:", msgError.message);
+                            }
+                        }
+
                     } else {
                         console.warn(`⚠️ Lead not found for number: ${waId}. Flow data logged but not linked to lead.`);
                     }

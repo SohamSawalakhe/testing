@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   X,
   Workflow,
@@ -188,25 +188,25 @@ export default function FlowEditorModal({
     flowJson: JSON.stringify(SAMPLE_FLOW_JSON, null, 2),
   });
   const [saving, setSaving] = useState(false);
-  const [localValidationErrors, setLocalValidationErrors] = useState<any[]>([]);
+  const [localValidationErrors, setLocalValidationErrors] = useState<Array<Record<string, unknown>>>([]);
 
   // Helper: Parse JSON back to Screens for Visual Builder
-  const parseJSONToScreens = (json: Record<string, unknown>): FlowScreen[] => {
-    if (!json.screens) return screens; // Fallback to default if invalid
+  const parseJSONToScreens = useCallback((json: Record<string, unknown>): FlowScreen[] => {
+    if (!json.screens) return []; // Return empty array if invalid
 
     return (json.screens as Array<Record<string, unknown>>).map((s: Record<string, unknown>) => ({
-      id: s.id,
-      title: s.title,
-      terminal: s.terminal || false,
+      id: String(s.id),
+      title: String(s.title),
+      terminal: Boolean(s.terminal),
       children: parseChildrenToComponents(
-        s.layout?.children || [],
-        json.routing_model,
-        s.id,
+        (s.layout as Record<string, unknown> | undefined)?.children as Array<Record<string, unknown>> || [],
+        json.routing_model as Record<string, unknown>,
+        String(s.id),
       ),
     }));
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const parseChildrenToComponents = (
+  const parseChildrenToComponents = useCallback((
     children: Array<Record<string, unknown>>,
     routingModel: Record<string, unknown> = {},
     currentScreenId: string = "",
@@ -282,30 +282,33 @@ export default function FlowEditorModal({
         } else if (child.type === "Footer") {
           type = "Footer";
           data = { label: child.label };
-          const action = child["on-click-action"] || child["on_click_action"];
+          const action = (child["on-click-action"] || child["on_click_action"]) as Record<string, unknown> | undefined;
 
           if (action) {
-            if (action.name === "complete") {
+            const actionName = action.name as string | undefined;
+            if (actionName === "complete") {
               data.actionType = "complete";
               data.nextScreenId = "";
-            } else if (action.name === "data_exchange") {
+            } else if (actionName === "data_exchange") {
               data.actionType = "data_exchange";
               // 1. Try payload next_screen_id (V3/5)
-              if (action.payload && action.payload.next_screen_id) {
-                data.nextScreenId = action.payload.next_screen_id;
+              const payload = action.payload as Record<string, unknown> | undefined;
+              if (payload && payload.next_screen_id) {
+                data.nextScreenId = payload.next_screen_id;
               }
               // 2. Fallback to routing model (V2)
               else {
-                const routes = routingModel[currentScreenId];
-                if (routes && routes.length > 0) {
+                const routes = routingModel[currentScreenId] as unknown[] | undefined;
+                if (routes && Array.isArray(routes) && routes.length > 0) {
                   data.nextScreenId = routes[0];
                 } else {
                   data.nextScreenId = "";
                 }
               }
-            } else if (action.name === "navigate") {
+            } else if (actionName === "navigate") {
               data.actionType = "navigate";
-              data.nextScreenId = action.next?.name;
+              const next = action.next as Record<string, unknown> | undefined;
+              data.nextScreenId = next?.name;
             }
           } else {
             // Default
@@ -314,7 +317,7 @@ export default function FlowEditorModal({
         } else if (child.type === "Form") {
           // Flatten Form children for this simple builder
           return parseChildrenToComponents(
-            child.children || [],
+            (child.children as Array<Record<string, unknown>>) || [],
             routingModel,
             currentScreenId,
           );
@@ -326,7 +329,7 @@ export default function FlowEditorModal({
         return { id: baseId, type, data };
       })
       .flat();
-  };
+  }, []);
 
   useEffect(() => {
     if (flow) {
@@ -354,7 +357,7 @@ export default function FlowEditorModal({
         console.error("Failed to parse existing flow for builder", e);
       }
     }
-  }, [flow]);
+  }, [flow, parseJSONToScreens, parseChildrenToComponents]);
 
   const validateJSON = (jsonString: string) => {
     try {
@@ -417,7 +420,7 @@ export default function FlowEditorModal({
       onSave();
     } catch (error: unknown) {
       console.error("Error saving Flow:", error);
-      const err = error as { response?: { data?: { message?: string, validationErrors?: any[] } } };
+      const err = error as { response?: { data?: { message?: string, validationErrors?: Array<Record<string, unknown>> } } };
       
       // Extract detailed validation errors if available
       const apiErrors = err.response?.data?.validationErrors || [];
@@ -518,7 +521,7 @@ export default function FlowEditorModal({
     }
 
     if (isLocked) {
-      const updates: any = {};
+      const updates: Record<string, unknown> = {};
       // 1. Sync forced action type
       if (enforcedType !== selectedComponent.data.actionType) {
         updates.actionType = enforcedType;
@@ -535,7 +538,7 @@ export default function FlowEditorModal({
         updateComponent(selectedComponentId, updates);
       }
     }
-  }, [selectedComponentId, activeScreenId, screens]);
+  }, [selectedComponentId, activeScreenId, screens]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- JSON GENERATION ---
   const generateJSONFromScreens = () => {
@@ -596,10 +599,10 @@ export default function FlowEditorModal({
 
       const childrenJson = screen.children.map((comp) => {
         if (["TextInput", "Dropdown", "RadioButtons", "CheckboxGroup", "DatePicker"].includes(comp.type)) {
-          const uniqueName = getUniqueName(comp.data.name);
+          const uniqueName = getUniqueName(String(comp.data.name || ''));
 
           if (comp.type === "TextInput") {
-            const label = (comp.data.label || "Input").trim() || "Input";
+            const label = String(comp.data.label || "Input").trim() || "Input";
             const textInputObj: Record<string, unknown> = {
               type: "TextInput",
               name: uniqueName,
@@ -612,7 +615,7 @@ export default function FlowEditorModal({
             return textInputObj;
           }
           if (comp.type === "DatePicker") {
-            const label = (comp.data.label || "Date").trim() || "Date";
+            const label = String(comp.data.label || "Date").trim() || "Date";
             return {
               type: "DatePicker",
               name: uniqueName,
@@ -660,7 +663,7 @@ export default function FlowEditorModal({
           const jsonComp: Record<string, unknown> = {
             type: finalType,
             name: uniqueName,
-            label: (comp.data.label || "Select").trim() || "Select",
+            label: String(comp.data.label || "Select").trim() || "Select",
             required: !!comp.data.required,
             initial_value: comp.data.initialValue || undefined,
             "data-source": options // Unified property for V6.0+
@@ -673,7 +676,7 @@ export default function FlowEditorModal({
         switch (comp.type) {
           case "TextHeading":
             // V6.0: text cannot be empty
-            const headingText = (comp.data.text || "").trim();
+            const headingText = String(comp.data.text || "").trim();
             if (!headingText) return null; // Skip empty headings
             return {
               type: "TextHeading",
@@ -681,7 +684,7 @@ export default function FlowEditorModal({
             };
           case "TextBody":
             // V6.0: text cannot be empty
-            const bodyText = (comp.data.text || "").trim();
+            const bodyText = String(comp.data.text || "").trim();
             if (!bodyText) return null; // Skip empty body text
             return {
               type: "TextBody",
@@ -693,7 +696,7 @@ export default function FlowEditorModal({
             const actionType = comp.data.actionType || "navigate";
 
             // Resolve target ID
-            let nextScreenId = comp.data.nextScreenId ? screenIdMap.get(comp.data.nextScreenId) : "";
+            let nextScreenId = comp.data.nextScreenId ? screenIdMap.get(String(comp.data.nextScreenId)) : "";
 
             // Auto-next screen if not set and not terminal
             if (!nextScreenId && !screen.terminal && sIdx < validScreens.length - 1) {
@@ -723,7 +726,7 @@ export default function FlowEditorModal({
 
               screen.children.forEach(c => {
                 if (["TextInput", "Dropdown", "RadioButtons", "CheckboxGroup", "DatePicker"].includes(c.type)) {
-                  const fName = tempGetUnique(c.data.name);
+                  const fName = tempGetUnique(String(c.data.name || ''));
                   payload[fName] = `\${form.${fName}}`;
                 }
               });
@@ -737,7 +740,7 @@ export default function FlowEditorModal({
 
             return {
               type: "Footer",
-              label: (comp.data.label || "Continue").trim() || "Continue",
+              label: String(comp.data.label || "Continue").trim() || "Continue",
               "on-click-action": action
             };
           default:
@@ -769,7 +772,7 @@ export default function FlowEditorModal({
 
     // Build routing_model - define forward routes for data_exchange flows
     // Each screen maps to an array of screens it can navigate to
-    const routing_model: any = {};
+    const routing_model: Record<string, string[]> = {};
 
     validScreens.forEach((screen, sIdx) => {
       const routes: string[] = [];
@@ -780,7 +783,7 @@ export default function FlowEditorModal({
         // Check if there's a specific next screen in the footer
         const footer = screen.children.find(c => c.type === "Footer");
         if (footer?.data?.nextScreenId) {
-          const mappedNextId = screenIdMap.get(footer.data.nextScreenId);
+          const mappedNextId = screenIdMap.get(String(footer.data.nextScreenId));
           if (mappedNextId) {
             routes.push(mappedNextId);
           }
@@ -904,13 +907,13 @@ export default function FlowEditorModal({
   };
 
   // Helper: Convert label to valid field name (snake_case, lowercase)
-  const labelToFieldName = (label: string): string => {
+  const labelToFieldName = useCallback((label: string): string => {
     return label
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '')
       || 'field';
-  };
+  }, []);
 
   const addComponent = (type: FlowComponentType) => {
     // Generate smart default labels based on component type
@@ -1023,7 +1026,7 @@ export default function FlowEditorModal({
     );
   };
 
-  const updateComponent = (compId: string, data: any) => {
+  const updateComponent = useCallback((compId: string, data: Record<string, unknown>) => {
     setScreens(
       screens.map((s) => {
         if (s.id === activeScreenId) {
@@ -1037,7 +1040,7 @@ export default function FlowEditorModal({
                 const updatedData = { ...c.data, ...data };
                 if (isFormInput && data.label && !data.name) {
                   // Only auto-update name if user changed label but not name
-                  updatedData.name = labelToFieldName(data.label);
+                  updatedData.name = labelToFieldName(String(data.label));
                 }
 
                 return { ...c, data: updatedData };
@@ -1049,7 +1052,7 @@ export default function FlowEditorModal({
         return s;
       }),
     );
-  };
+  }, [screens, activeScreenId, labelToFieldName]);
 
   const deleteComponent = (compId: string) => {
     setScreens(
@@ -1171,7 +1174,7 @@ export default function FlowEditorModal({
                       </h3>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                      {screens.map((s, index) => {
+                      {screens.map((s) => {
                         // Find what this screen navigates to
                         const footer = s.children.find((c) => c.type === "Footer");
                         const nextScreenId = footer?.data?.nextScreenId;
@@ -1240,22 +1243,23 @@ export default function FlowEditorModal({
                   <div className="flex-1 overflow-y-auto bg-muted/10 flex flex-col items-center p-4 relative">
                     {/* Validation Errors Panel */}
                     {localValidationErrors.length > 0 && (
-                      <div className="w-full max-w-[400px] mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-xs shadow-sm animate-in fade-in slide-in-from-top-2 z-30">
+                      <div className="w-full max-w-100 mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-xs shadow-sm animate-in fade-in slide-in-from-top-2 z-30">
                         <div className="font-bold flex items-center gap-2 mb-1">
                           <Trash2 className="w-3 h-3" />
                           Meta Flow Validation Errors ({localValidationErrors.length})
                           <button 
                             onClick={() => setLocalValidationErrors([])}
-                            className="ml-auto hover:bg-red-200 p-0.5 rounded"
+                            className="ml-auto text-red-500 hover:text-red-700 transition-colors"
+                            title="Dismiss errors"
                           >
                             <X className="w-3 h-3" />
                           </button>
                         </div>
-                        <ul className="list-disc pl-4 space-y-1 max-h-[150px] overflow-y-auto">
+                        <ul className="list-disc pl-4 space-y-1 max-h-37.5 overflow-y-auto">
                           {localValidationErrors.map((err, i) => (
                             <li key={i}>
-                              <span className="font-semibold">{err.message}</span>
-                              {err.path && <span className="opacity-70 mx-1 font-mono">[{err.path}]</span>}
+                              <span className="font-semibold">{String(err.message || 'Validation error')}</span>
+                              {err.path ? <span className="opacity-70 mx-1 font-mono">[{String(err.path)}]</span> : null}
                             </li>
                           ))}
                         </ul>
@@ -1263,7 +1267,7 @@ export default function FlowEditorModal({
                     )}
                     {/* Mobile Frame - Scaled for fit */}
                     {/* Mobile Frame - Scaled for fit, centered via margin */}
-                    <div className="w-[320px] h-[640px] bg-background border-[6px] border-zinc-800 rounded-[3rem] shadow-2xl relative flex flex-col shrink-0 scale-90 origin-center overflow-hidden my-auto">
+                    <div className="w-[320px] h-160 bg-background border-[6px] border-zinc-800 rounded-[3rem] shadow-2xl relative flex flex-col shrink-0 scale-90 origin-center overflow-hidden my-auto">
                       {/* Status Bar */}
                       <div className="bg-zinc-100 h-6 flex items-center justify-between px-5 text-[10px] font-medium border-b shrink-0 select-none text-zinc-900">
                         <span>9:41</span>
@@ -1292,7 +1296,7 @@ export default function FlowEditorModal({
                       {/* Screen Content Canvas */}
                       <div className="flex-1 bg-[#efeae2] p-3 overflow-y-auto relative scrollbar-hide">
                         {/* The Flow UI Container - FORCE LIGHT MODE for preview accuracy */}
-                        <div className="bg-white rounded-lg shadow-sm min-h-[300px] flex flex-col relative overflow-hidden text-zinc-900">
+                        <div className="bg-white rounded-lg shadow-sm min-h-75 flex flex-col relative overflow-hidden text-zinc-900">
                           {/* Screen Header */}
                           <div className="h-10 border-b flex items-center justify-between px-3 shrink-0 bg-white z-10 sticky top-0">
                             <X className="w-4 h-4 opacity-50 text-zinc-600" />
@@ -1301,7 +1305,7 @@ export default function FlowEditorModal({
                                 <input
                                   type="text"
                                   autoFocus
-                                  className="font-semibold text-xs text-center text-zinc-900 bg-white border-b border-primary outline-none max-w-[150px]"
+                                  className="font-semibold text-xs text-center text-zinc-900 bg-white border-b border-primary outline-none max-w-37.5"
                                   value={inlineEditValue}
                                   onChange={(e) => setInlineEditValue(e.target.value)}
                                   onBlur={() => {
@@ -1326,11 +1330,11 @@ export default function FlowEditorModal({
                               <div className="flex flex-col items-center group/title cursor-pointer"
                                 onDoubleClick={() => {
                                   setInlineEditId("screen_title");
-                                  setInlineEditValue(activeScreenContext?.title || "");
+                                   setInlineEditValue((activeScreenContext?.title as string) || "");
                                 }}
                                 title="Double-click to rename screen"
                               >
-                                <span className="font-semibold text-xs truncate max-w-[150px] text-zinc-900 hover:text-primary transition-colors">
+                                <span className="font-semibold text-xs truncate max-w-37.5 text-zinc-900 hover:text-primary transition-colors">
                                   {activeScreenContext?.title}
                                 </span>
                                 <span className="text-[9px] text-zinc-400 font-mono group-hover/title:text-zinc-600 transition-colors">
@@ -1432,11 +1436,11 @@ export default function FlowEditorModal({
                                       onDoubleClick={(e) => {
                                         e.stopPropagation();
                                         setInlineEditId(comp.id);
-                                        setInlineEditValue(comp.data.text || "");
+                                        setInlineEditValue((comp.data.text as string) || "");
                                       }}
                                       title="Double-click to edit"
                                     >
-                                      {comp.data.text || "Click to edit"}
+                                      {String(comp.data.text || "Click to edit")}
                                     </h1>
                                   )
                                 )}
@@ -1444,7 +1448,7 @@ export default function FlowEditorModal({
                                   inlineEditId === comp.id ? (
                                     <textarea
                                       autoFocus
-                                      className="text-sm text-zinc-500 bg-white border border-primary outline-none w-full min-h-[60px] rounded p-1"
+                                      className="text-sm text-zinc-500 bg-white border border-primary outline-none w-full min-h-15 rounded p-1"
                                       value={inlineEditValue}
                                       onChange={(e) => setInlineEditValue(e.target.value)}
                                       onBlur={() => {
@@ -1463,11 +1467,11 @@ export default function FlowEditorModal({
                                       onDoubleClick={(e) => {
                                         e.stopPropagation();
                                         setInlineEditId(comp.id);
-                                        setInlineEditValue(comp.data.text || "");
+                                        setInlineEditValue((comp.data.text as string) || "");
                                       }}
                                       title="Double-click to edit"
                                     >
-                                      {comp.data.text || "Click to edit"}
+                                      {String(comp.data.text || "Click to edit")}
                                     </p>
                                   )
                                 )}
@@ -1501,26 +1505,26 @@ export default function FlowEditorModal({
                                             onDoubleClick={(e) => {
                                               e.stopPropagation();
                                               setInlineEditId(`${comp.id}_label`);
-                                              setInlineEditValue(comp.data.label || "");
+                                              setInlineEditValue(String(comp.data.label || ""));
                                             }}
                                             title="Double-click to edit label"
                                           >
-                                            {comp.data.label}{" "}
-                                            {comp.data.required && (
+                                            {String(comp.data.label)}{" "}
+                                            {comp.data.required ? (
                                               <span className="text-red-500">*</span>
-                                            )}
+                                            ) : null}
                                           </label>
                                           {/* Show field name */}
                                           <span className="text-[9px] text-zinc-400 font-mono bg-zinc-100 px-1 rounded" title="Field name in JSON/CSV">
-                                            {comp.data.name || "field"}
+                                            {String(comp.data.name || "field")}
                                           </span>
                                         </div>
                                       )}
                                       <div className="h-10 w-full bg-transparent border border-zinc-300 rounded-lg px-3 flex items-center text-sm text-zinc-400">
                                         {comp.type === "TextInput" ? (
                                           <span className="truncate">
-                                            {comp.data.text ||
-                                              `Enter ${comp.data.label}`}
+                                            {String(comp.data.text ||
+                                              `Enter ${comp.data.label}`)}
                                           </span>
                                         ) : (
                                           "DD/MM/YYYY"
@@ -1559,17 +1563,17 @@ export default function FlowEditorModal({
                                             onDoubleClick={(e) => {
                                               e.stopPropagation();
                                               setInlineEditId(`${comp.id}_label`);
-                                              setInlineEditValue(comp.data.label || "");
+                                              setInlineEditValue(String(comp.data.label || ""));
                                             }}
                                             title="Double-click to edit label"
                                           >
-                                            {comp.data.label}{" "}
-                                            {comp.data.required && (
+                                            {String(comp.data.label)}{" "}
+                                            {comp.data.required ? (
                                               <span className="text-red-500">*</span>
-                                            )}
+                                            ) : null}
                                           </label>
                                           <span className="text-[9px] text-zinc-400 font-mono bg-zinc-100 px-1 rounded">
-                                            {comp.data.name || "field"}
+                                            {String(comp.data.name || "field")}
                                           </span>
                                         </div>
                                       )}
@@ -1596,14 +1600,14 @@ export default function FlowEditorModal({
                                                   value={inlineEditValue}
                                                   onChange={(e) => setInlineEditValue(e.target.value)}
                                                   onBlur={() => {
-                                                    const newOpts = [...(comp.data.options || [])];
+                                                    const newOpts = [...((comp.data.options as Array<Record<string, unknown>>) || [])];
                                                     newOpts[optIdx] = { ...newOpts[optIdx], title: inlineEditValue };
                                                     updateComponent(comp.id, { options: newOpts });
                                                     setInlineEditId(null);
                                                   }}
                                                   onKeyDown={(e) => {
                                                     if (e.key === 'Enter') {
-                                                      const newOpts = [...(comp.data.options || [])];
+                                                      const newOpts = [...((comp.data.options as Array<Record<string, unknown>>) || [])];
                                                       newOpts[optIdx] = { ...newOpts[optIdx], title: inlineEditValue };
                                                       updateComponent(comp.id, { options: newOpts });
                                                       setInlineEditId(null);
@@ -1616,9 +1620,9 @@ export default function FlowEditorModal({
                                                   className="text-sm text-zinc-700 hover:bg-primary/5 cursor-text px-1 -mx-1 rounded block truncate"
                                                   onDoubleClick={(e) => {
                                                     e.stopPropagation();
-                                                    setInlineEditId(`opt_${opt.id}`);
-                                                    setInlineEditValue(opt.title || "");
-                                                  }}
+                                                     setInlineEditId(`opt_${opt.id}`);
+                                                     setInlineEditValue((opt.title as string) || "");
+                                                   }}
                                                   title="Double-click to edit option"
                                                 >
                                                   {opt.title || opt.id}
@@ -1645,7 +1649,7 @@ export default function FlowEditorModal({
                                           className="flex items-center gap-1 text-[10px] text-primary hover:underline mt-1 pl-6"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            const currentOpts = comp.data.options || [];
+                                            const currentOpts = (comp.data.options as Array<Record<string, unknown>>) || [];
                                             // Generate short unique suffix
                                             const newId = `opt_${Date.now().toString().slice(-4)}`;
                                             const newOpt = {
@@ -1691,12 +1695,12 @@ export default function FlowEditorModal({
                                         className="w-full h-10 text-sm font-semibold text-white bg-[#007bff] rounded-full shadow-sm hover:bg-[#0056b3] transition-colors"
                                         onDoubleClick={(e) => {
                                           e.stopPropagation();
-                                          setInlineEditId(comp.id);
-                                          setInlineEditValue(comp.data.label || "Continue");
-                                        }}
+                                           setInlineEditId(comp.id);
+                                           setInlineEditValue((comp.data.label as string) || "Continue");
+                                         }}
                                         title="Double-click to edit button text"
                                       >
-                                        {comp.data.label}
+                                        {String(comp.data.label)}
                                       </button>
                                     )}
                                   </div>
@@ -1848,12 +1852,12 @@ export default function FlowEditorModal({
                                   <label className="text-[10px] uppercase font-bold text-muted-foreground">
                                     Text Content
                                   </label>
-                                  <textarea
-                                    className={`w-full text-xs bg-background border px-2 py-1.5 rounded min-h-[80px] ${inlineEditId === "props_text" ? "border-primary ring-1 ring-primary/20" : ""}`}
-                                    value={inlineEditId === "props_text" ? inlineEditValue : (selectedComponentContext?.data.text || "")}
+                                   <textarea
+                                     className={`w-full text-xs bg-background border px-2 py-1.5 rounded min-h-20 ${inlineEditId === "props_text" ? "border-primary ring-1 ring-primary/20" : ""}`}
+                                     value={inlineEditId === "props_text" ? inlineEditValue : ((selectedComponentContext?.data.text as string) || "")}
                                     onFocus={() => {
                                       setInlineEditId("props_text");
-                                      setInlineEditValue(selectedComponentContext?.data.text || "");
+                                      setInlineEditValue((selectedComponentContext?.data.text as string) || "");
                                     }}
                                     onChange={(e) => setInlineEditValue(e.target.value)}
                                     onBlur={() => {
@@ -1882,7 +1886,7 @@ export default function FlowEditorModal({
                                     <input
                                       type="text"
                                       className="w-full text-xs bg-background border px-2 py-1.5 rounded"
-                                      value={selectedComponentContext?.data.label || ""}
+                                      value={String(selectedComponentContext?.data.label || "")}
                                       onChange={(e) => selectedComponentId && updateComponent(selectedComponentId, { label: e.target.value })}
                                     />
                                   </div>
@@ -1896,7 +1900,7 @@ export default function FlowEditorModal({
                                         <input
                                           type="text"
                                           className="w-full text-xs bg-background border px-2 py-1.5 rounded font-mono"
-                                          value={selectedComponentContext?.data.name || ""}
+                                          value={String(selectedComponentContext?.data.name || "")}
                                           onChange={(e) => selectedComponentId && updateComponent(selectedComponentId, { name: e.target.value })}
                                           placeholder="e.g. first_name"
                                         />
@@ -1905,7 +1909,7 @@ export default function FlowEditorModal({
                                         <input
                                           type="checkbox"
                                           id="req-check"
-                                          checked={selectedComponentContext?.data.required || false}
+                                          checked={Boolean(selectedComponentContext?.data.required) || false}
                                           onChange={(e) => selectedComponentId && updateComponent(selectedComponentId, { required: e.target.checked })}
                                         />
                                         <label htmlFor="req-check" className="text-xs">
@@ -1930,15 +1934,15 @@ export default function FlowEditorModal({
                                       size="sm"
                                       className="h-5 text-[10px] px-2"
                                       onClick={() => {
-                                        const currentOpts = selectedComponentContext.data.options || [];
+                                        const currentOpts = selectedComponentContext.data.options;
                                         const newOpt = { id: `opt_${Date.now()}`, title: "New Option" };
-                                        updateComponent(selectedComponentContext.id, { options: [...currentOpts, newOpt] });
+                                        updateComponent(selectedComponentContext.id, { options: [...(Array.isArray(currentOpts) ? currentOpts : []), newOpt] });
                                       }}
                                     >
                                       <Plus className="w-3 h-3 mr-1" /> Add
                                     </Button>
                                   </div>
-                                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                                  <div className="space-y-2 max-h-75 overflow-y-auto pr-1">
                                     {typeof selectedComponentContext?.data.options === "string" ? (
                                       <div className="p-3 bg-blue-50 text-blue-700 text-[10px] rounded-lg border border-blue-100 space-y-2">
                                         <div className="font-bold flex items-center gap-1.5">
@@ -1985,7 +1989,8 @@ export default function FlowEditorModal({
                                                   className="w-full text-xs bg-background border px-2 py-1 rounded"
                                                   value={opt.title}
                                                   onChange={(e) => {
-                                                    const newOpts = [...(selectedComponentContext.data.options || [])];
+                                                    const currentOptions = selectedComponentContext.data.options;
+                                                    const newOpts = [...(Array.isArray(currentOptions) ? currentOptions : [])];
                                                     newOpts[idx] = { ...newOpts[idx], title: e.target.value };
                                                     updateComponent(selectedComponentContext.id, { options: newOpts });
                                                   }}
@@ -1997,7 +2002,8 @@ export default function FlowEditorModal({
                                                   className="w-full text-xs bg-muted/50 border px-2 py-1 rounded font-mono"
                                                   value={opt.id}
                                                   onChange={(e) => {
-                                                    const newOpts = [...(selectedComponentContext.data.options || [])];
+                                                    const currentOpts = selectedComponentContext.data.options;
+                                                    const newOpts = [...(Array.isArray(currentOpts) ? currentOpts : [])];
                                                     newOpts[idx] = { ...newOpts[idx], id: e.target.value };
                                                     updateComponent(selectedComponentContext.id, { options: newOpts });
                                                   }}
@@ -2069,7 +2075,7 @@ export default function FlowEditorModal({
                                       </div>
                                       <select
                                         className={`w-full text-xs bg-background border px-2 py-1.5 rounded ${isLocked ? "opacity-70 bg-muted cursor-not-allowed" : ""}`}
-                                        value={isLocked ? enforcedType : (selectedComponentContext?.data.actionType || "navigate")}
+                                        value={isLocked ? String(enforcedType) : String(selectedComponentContext?.data.actionType || "navigate")}
                                         onChange={(e) => selectedComponentId && updateComponent(selectedComponentId, { actionType: e.target.value })}
                                         disabled={isLocked}
                                       >
@@ -2089,7 +2095,7 @@ export default function FlowEditorModal({
                                   </label>
                                   <select
                                     className="w-full text-xs bg-background border px-2 py-1.5 rounded"
-                                    value={selectedComponentContext?.data.nextScreenId || ""}
+                                    value={String(selectedComponentContext?.data.nextScreenId || "")}
                                     onChange={(e) => selectedComponentId && updateComponent(selectedComponentId, { nextScreenId: e.target.value })}
                                   >
                                     <option value="" disabled>Select Screen...</option>
@@ -2103,7 +2109,7 @@ export default function FlowEditorModal({
                                     </p>
                                   )}
                                   {selectedComponentContext?.data.actionType === "data_exchange" && (
-                                    <p className="text-[10px] text-muted-foreground mt-1 text-orange-600">
+                                    <p className="text-[10px] text-orange-600 mt-1">
                                       Server <b>MUST</b> return this screen ID after processing.
                                     </p>
                                   )}

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     ArrowLeft,
     Download,
     Eye,
     FileText,
-    Search,
     Filter,
     X,
     ChevronLeft,
@@ -22,19 +21,89 @@ import { toast } from "react-toastify";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+interface ConfirmationToastProps {
+    closeToast?: () => void;
+    message: string;
+    description: string;
+    onConfirm: () => void;
+    confirmLabel?: string;
+}
+
+const ConfirmationToast = ({
+    closeToast,
+    message,
+    description,
+    onConfirm,
+    confirmLabel = "Confirm",
+}: ConfirmationToastProps) => (
+    <div className="flex flex-col gap-2">
+        <p className="font-semibold text-sm text-foreground">{message}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+        <div className="flex gap-2 mt-2 justify-end">
+            <button
+                onClick={closeToast}
+                className="px-3 py-1.5 text-xs font-medium bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors"
+            >
+                Cancel
+            </button>
+            <button
+                onClick={() => {
+                    onConfirm();
+                    if (closeToast) closeToast();
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+            >
+                {confirmLabel}
+            </button>
+        </div>
+    </div>
+);
+
+interface Flow {
+    id: string;
+    name: string;
+    status: string;
+    category?: string;
+}
+
+interface FlowResponse {
+    id: string;
+    createdAt: string;
+    status: string;
+    responseData: Record<string, string | number | boolean | null | undefined>;
+    flow?: {
+        name: string;
+        category: string;
+    };
+    conversation?: {
+        lead?: {
+            phoneNumber?: string;
+            email?: string;
+            companyName?: string;
+        }
+    }
+}
+
+interface Pagination {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+
 function ResponsesContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const flowIdParam = searchParams.get("flowId");
 
-    const [flows, setFlows] = useState<any[]>([]);
+    const [flows, setFlows] = useState<Flow[]>([]);
     const [selectedFlowId, setSelectedFlowId] = useState<string>(flowIdParam || "all");
     const [loadingFlows, setLoadingFlows] = useState(true);
 
     const [loading, setLoading] = useState(false);
-    const [responses, setResponses] = useState<any[]>([]);
-    const [selectedResponse, setSelectedResponse] = useState<any>(null);
-    const [pagination, setPagination] = useState({
+    const [responses, setResponses] = useState<FlowResponse[]>([]);
+    const [selectedResponse, setSelectedResponse] = useState<FlowResponse | null>(null);
+    const [pagination, setPagination] = useState<Pagination>({
         page: 1,
         limit: 20,
         total: 0,
@@ -42,45 +111,14 @@ function ResponsesContent() {
     });
     const [statusFilter, setStatusFilter] = useState("all");
 
-    useEffect(() => {
-        fetchFlows();
-    }, []);
-
-    useEffect(() => {
-        if (selectedFlowId) {
-            // Update URL
-            const url = new URL(window.location.href);
-            url.searchParams.set("flowId", selectedFlowId);
-            window.history.pushState({}, "", url.toString());
-
-            fetchResponses(1);
-        } else {
-            setResponses([]);
-            setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 });
-        }
-    }, [selectedFlowId, statusFilter]);
-
-    // Add auto-polling every 15 seconds
-    useEffect(() => {
-        let interval: any;
-        if (selectedFlowId && selectedFlowId !== "all" && pagination.page === 1) {
-            interval = setInterval(() => {
-                fetchResponses(1, true); // Silent refresh
-            }, 15000);
-        }
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [selectedFlowId, pagination.page]);
-
-    const fetchFlows = async () => {
+    const fetchFlows = useCallback(async () => {
         try {
             setLoadingFlows(true);
             const response = await api.get("/whatsapp/flows");
             const flowsData = response.data.flows || [];
             setFlows(flowsData);
 
-            if (flowIdParam && flowsData.find((f: any) => f.id === flowIdParam)) {
+            if (flowIdParam && flowsData.find((f: Flow) => f.id === flowIdParam)) {
                 setSelectedFlowId(flowIdParam);
             }
         } catch (error) {
@@ -89,9 +127,9 @@ function ResponsesContent() {
         } finally {
             setLoadingFlows(false);
         }
-    };
+    }, [flowIdParam]);
 
-    const fetchResponses = async (page: number, silent = false) => {
+    const fetchResponses = useCallback(async (page: number, silent = false) => {
         if (!selectedFlowId) return;
 
         try {
@@ -120,7 +158,38 @@ function ResponsesContent() {
         } finally {
             if (!silent) setLoading(false);
         }
-    };
+    }, [selectedFlowId, pagination.limit, statusFilter]);
+
+    useEffect(() => {
+        fetchFlows();
+    }, [fetchFlows]);
+
+    useEffect(() => {
+        if (selectedFlowId) {
+            // Update URL
+            const url = new URL(window.location.href);
+            url.searchParams.set("flowId", selectedFlowId);
+            window.history.pushState({}, "", url.toString());
+
+            fetchResponses(1);
+        } else {
+            setResponses([]);
+            setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 });
+        }
+    }, [selectedFlowId, fetchResponses]);
+
+    // Add auto-polling every 15 seconds
+    useEffect(() => {
+        let interval: NodeJS.Timeout | undefined;
+        if (selectedFlowId && selectedFlowId !== "all" && pagination.page === 1) {
+            interval = setInterval(() => {
+                fetchResponses(1, true); // Silent refresh
+            }, 15000);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [selectedFlowId, pagination.page, fetchResponses]);
 
     const exportResponses = async () => {
         if (!selectedFlowId) return;
@@ -139,27 +208,35 @@ function ResponsesContent() {
             a.download = `flow-responses-${flowName}-${new Date().toISOString().split("T")[0]}.csv`;
             a.click();
             toast.success("Responses exported!");
-        } catch (error) {
+        } catch {
             toast.error("Failed to export responses");
         }
     };
 
-    const handleDeleteResponse = async (responseId: string) => {
-        if (!confirm("Are you sure you want to delete this response? This action cannot be undone.")) return;
-
-        try {
-            const response = await api.delete(`/whatsapp/flows/${selectedFlowId}/responses/${responseId}`);
-            if (response.data.success) {
-                toast.success("Response deleted successfully");
-                fetchResponses(pagination.page);
-            }
-        } catch (error) {
-            console.error("Error deleting response:", error);
-            toast.error("Failed to delete response");
-        }
+    const handleDeleteResponse = (responseId: string) => {
+        toast(
+            <ConfirmationToast
+                message="Delete this response?"
+                description="This action cannot be undone."
+                confirmLabel="Delete"
+                onConfirm={async () => {
+                    try {
+                        const response = await api.delete(`/whatsapp/flows/${selectedFlowId}/responses/${responseId}`);
+                        if (response.data.success) {
+                            toast.success("Response deleted successfully");
+                            fetchResponses(pagination.page);
+                        }
+                    } catch (error) {
+                        console.error("Error deleting response:", error);
+                        toast.error("Failed to delete response");
+                    }
+                }}
+            />,
+            { autoClose: false, closeOnClick: false }
+        );
     };
 
-    const convertToCSV = (data: any[]) => {
+    const convertToCSV = (data: FlowResponse[]) => {
         if (data.length === 0) return "";
         const dynamicKeys = new Set<string>();
         data.forEach(item => {
@@ -179,7 +256,7 @@ function ResponsesContent() {
             return `"${String(str).replace(/"/g, '""')}"`;
         };
 
-        const rows = data.map((item: any) => {
+        const rows = data.map((item: FlowResponse) => {
             const responseData = item.responseData || {};
             const row = [
                 new Date(item.createdAt).toLocaleString(),
@@ -191,7 +268,8 @@ function ResponsesContent() {
                 item.status,
             ];
             sortedKeys.forEach(key => {
-                row.push(responseData[key] !== undefined ? responseData[key] : "");
+                const value = responseData[key];
+                row.push(value !== undefined && value !== null ? String(value) : "");
             });
             return row;
         });
@@ -277,7 +355,7 @@ function ResponsesContent() {
                 </div>
 
                 {/* Content Table */}
-                <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden min-h-[400px]">
+                <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden min-h-100">
                     {!selectedFlowId ? (
                         <div className="flex flex-col items-center justify-center h-full py-20 text-center">
                             <FileText className="w-16 h-16 text-muted-foreground/30 mb-4" />
@@ -355,7 +433,7 @@ function ResponsesContent() {
                                                             </span>
                                                         </td>
                                                         {fieldColumns.map(field => (
-                                                            <td key={field} className="px-4 py-3 max-w-[200px] truncate text-foreground text-xs">
+                                                            <td key={field} className="px-4 py-3 max-w-50 truncate text-foreground text-xs">
                                                                 {(() => {
                                                                     const val = item.responseData?.[field];
                                                                     return val === undefined || val === null || val === '' ? '—' : (typeof val === 'object' ? JSON.stringify(val) : String(val));
@@ -488,7 +566,7 @@ function ResponsesContent() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border">
-                                                {Object.entries(selectedResponse.responseData || {}).map(([key, value]: [string, any]) => (
+                                                {Object.entries(selectedResponse.responseData || {}).map(([key, value]) => (
                                                     <tr key={key} className="hover:bg-muted/10">
                                                         <td className="px-4 py-3 font-medium text-foreground">{key.replace(/_/g, ' ')}</td>
                                                         <td className="px-4 py-3 text-muted-foreground break-all">
