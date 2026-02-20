@@ -778,22 +778,26 @@ export default function FlowEditorModal({
     validScreens.forEach((screen, sIdx) => {
       const routes: string[] = [];
 
-      // Find the Footer component to determine the next screen
-      if (!screen.terminal && sIdx < validScreens.length - 1) {
-        // Non-terminal screens can go to subsequent screens
-        // Check if there's a specific next screen in the footer
+      // Only add forward routes if it's not a terminal screen
+      if (!screen.terminal) {
+        // Find the Footer component logic
         const footer = screen.children.find(c => c.type === "Footer");
-        if (footer?.data?.nextScreenId) {
-          const mappedNextId = screenIdMap.get(String(footer.data.nextScreenId));
-          if (mappedNextId) {
-            routes.push(mappedNextId);
+        const actionType = footer?.data?.actionType || "navigate";
+
+        // Terminal or "complete" actions don't have forward routes
+        if (actionType !== "complete") {
+          let nextScreenId = footer?.data?.nextScreenId ? screenIdMap.get(String(footer.data.nextScreenId)) : "";
+          
+          if (!nextScreenId && sIdx < validScreens.length - 1) {
+            nextScreenId = validScreens[sIdx + 1].id;
           }
-        } else {
-          // Default: can navigate to the next screen in sequence
-          routes.push(validScreens[sIdx + 1].id);
+
+          if (nextScreenId) {
+            routes.push(nextScreenId);
+          }
         }
       }
-      // Terminal screens have empty routes (they complete the flow)
+
       routing_model[screen.id] = routes;
     });
 
