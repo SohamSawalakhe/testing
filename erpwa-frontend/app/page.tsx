@@ -167,7 +167,7 @@ export default function LandingPage() {
               Native WhatsApp Superpowers
             </h2>
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              Don&apos;t just send text. Create interactive experiences. GPSERP
+              Don&apos;t just send text. Create interactive experiences. ERPWA
               gives you access to the full Meta Business API suite.
             </p>
           </div>
@@ -396,13 +396,13 @@ export default function LandingPage() {
             <PricingCard
               title="Starter"
               price="$29"
-              description="Perfect for small businesses just getting started."
+              description="Perfect for small businesses starting with WhatsApp API."
               features={[
-                "1 WhatsApp Number",
-                "1,000 Conversations/mo",
-                "Basic Automation Rules",
-                "Standard Support",
-                "3 Team Members",
+                "1 WhatsApp API Number",
+                "Green Tick Assistance",
+                "Basic Unified Inbox",
+                "Campaign Broadcasts",
+                "Meta Chat Fees Billed Separately",
               ]}
               buttonText="Get Started"
               href="/login?plan=starter"
@@ -412,15 +412,15 @@ export default function LandingPage() {
             <PricingCard
               title="Professional"
               price="$79"
-              description="For growing teams that need advanced flows."
+              description="For growing businesses needing automation and flows."
               features={[
-                "5 WhatsApp Numbers",
-                "10,000 Conversations/mo",
-                "Visual Flow Builder",
+                "Up to 3 WhatsApp Numbers",
+                "Drag & Drop Flow Builder",
                 "CRM Integrations",
-                "Priority Support",
+                "Interactive Catalogs",
                 "Unlimited Team Members",
                 "Advanced Analytics",
+                "Meta Chat Fees Billed Separately",
               ]}
               buttonText="Start Free Trial"
               href="/login?plan=pro"
@@ -431,15 +431,15 @@ export default function LandingPage() {
             <PricingCard
               title="Enterprise"
               price="Custom"
-              description="Tailored solutions for large organizations."
+              description="Tailored solutions for large-scale operations."
               features={[
                 "Unlimited WhatsApp Numbers",
-                "Unlimited Conversations",
                 "Dedicated Success Manager",
                 "Custom API Development",
-                "SLA Guarantee",
+                "High Volume Throughput",
                 "On-premise Deployment",
-                "SSO & Advanced Security",
+                "SSO & Role-Based Access",
+                "Custom Volume Discounts",
               ]}
               buttonText="Contact Sales"
               href="mailto:sales@erpwa.com"
@@ -525,7 +525,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-slate-500">
-            <div>&copy; 2026 GPSERP. All rights reserved.</div>
+            <div>&copy; 2026 ERPWA. All rights reserved.</div>
             <div className="flex gap-8">
               <a href="#" className="hover:text-white transition-colors">
                 Privacy Policy
@@ -594,43 +594,62 @@ function SpotlightCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onMouseMove={handleMouseMove}
-      className="group relative h-full"
+      className="group relative h-full isolate"
     >
-      <div className="absolute -inset-px rounded-3xl bg-linear-to-r from-transparent via-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md" />
+      {/* Outer Glow on Hover */}
+      <div className="absolute -inset-1 rounded-3xl bg-linear-to-r from-purple-500 via-blue-500 to-cyan-500 opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-700" />
 
-      <div className="relative h-full overflow-hidden rounded-3xl bg-slate-900 border border-white/5 p-8 transition-colors duration-300 group-hover:bg-slate-800/50 group-hover:border-purple-500/20">
+      {/* Card Body */}
+      <div className="relative h-full overflow-hidden rounded-3xl bg-slate-900 border border-white/5 p-8 transition-colors duration-500 group-hover:bg-slate-800/80 group-hover:border-purple-500/30 shadow-xl shadow-black/50">
+        {/* Soft Inner Gradient behind the content */}
+        <div className="absolute inset-0 bg-linear-to-b from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
         <BorderBeam
-          size={300}
-          duration={15}
+          size={250}
+          duration={12}
           delay={delay * 9}
           colorFrom="#A855F7"
           colorTo="#3B82F6"
         />
 
+        {/* Dynamic Spotlight Effect following the mouse */}
         <div
-          className="pointer-events-none absolute -inset-px opacity-0 transition duration-300 group-hover:opacity-100"
+          className="pointer-events-none absolute -inset-px opacity-0 transition duration-500 group-hover:opacity-100 mix-blend-screen"
           style={{
-            background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, rgba(255,255,255,0.06), transparent 40%)`,
+            background: `radial-gradient(400px circle at ${position.x}px ${position.y}px, rgba(168,85,247,0.15), transparent 40%)`,
           }}
         />
 
         <div className="relative flex flex-col h-full z-10">
-          <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 border border-white/5 shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:bg-purple-500/10 group-hover:border-purple-500/20 group-hover:shadow-purple-500/20">
-            {/* Clone icon to pass hover classes if needed, or just wrap */}
-            <div
-              className={`transition-colors duration-300 ${isHovered ? "text-purple-300 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "text-slate-400"}`}
-            >
-              {icon}
+          {/* Header Row: Icon + Arrow */}
+          <div className="mb-6 flex items-start justify-between">
+            {/* Animated Icon Container */}
+            <div className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 border border-white/10 shadow-lg transition-all duration-500 overflow-hidden group-hover:scale-110 group-hover:shadow-[0_0_30px_-5px_rgba(168,85,247,0.4)] group-hover:border-purple-500/30">
+              {/* Spinning gradient behind the icon */}
+              <div className="absolute inset-0 bg-linear-to-tr from-purple-500/20 via-transparent to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div
+                className={`relative z-10 transition-colors duration-500 ${isHovered ? "text-purple-300 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" : "text-slate-400"}`}
+              >
+                {icon}
+              </div>
+            </div>
+
+            {/* Hover Indicator Arrow */}
+            <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center bg-white/5 opacity-0 -translate-x-4 transition-all duration-500 group-hover:opacity-100 group-hover:translate-x-0 group-hover:border-purple-500/30">
+              <ArrowRight className="w-4 h-4 text-purple-400" />
             </div>
           </div>
 
-          <h3 className="mb-3 text-xl font-bold text-white transition-colors duration-300 group-hover:text-purple-200">
+          <h3 className="mb-3 text-xl font-bold tracking-tight text-white transition-all duration-500 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-linear-to-r group-hover:from-white group-hover:to-purple-200">
             {title}
           </h3>
 
-          <p className="text-sm leading-relaxed text-slate-400 transition-colors duration-300 group-hover:text-slate-300">
+          <p className="text-sm leading-relaxed text-slate-400 transition-colors duration-500 group-hover:text-slate-300">
             {description}
           </p>
+
+          {/* Animated decorative bottom line */}
+          <div className="absolute bottom-[-32px] left-[-32px] right-[-32px] h-[2px] bg-linear-to-r from-transparent via-purple-500 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-out opacity-50" />
         </div>
       </div>
     </motion.div>
@@ -664,56 +683,114 @@ function PricingCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ delay, duration: 0.5 }}
-      className={`relative p-8 rounded-3xl flex flex-col h-full border transition-all duration-300 ${
+      className={`group relative h-full rounded-3xl p-px ${
         featured
-          ? "bg-slate-900/50 border-purple-500/50 shadow-2xl shadow-purple-900/20"
-          : "bg-slate-900/30 border-white/5 hover:border-white/10"
+          ? "shadow-2xl shadow-purple-900/40 z-10 scale-105"
+          : "shadow-xl shadow-black/50 z-0"
       }`}
     >
-      {featured && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-linear-to-r from-purple-600 to-blue-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-lg">
-          Most Popular
-        </div>
-      )}
-
-      <div className="mb-8">
-        <h3
-          className={`text-lg font-medium mb-2 ${featured ? "text-purple-300" : "text-slate-300"}`}
-        >
-          {title}
-        </h3>
-        <div className="flex items-baseline gap-1">
-          <span className="text-4xl font-bold text-white">{price}</span>
-          {price !== "Custom" && <span className="text-slate-500">/mo</span>}
-        </div>
-        <p className="text-sm text-slate-400 mt-4 h-10">{description}</p>
+      {/* Animated Flowing Gradient Border (Using standard Tailwind animations) */}
+      <div
+        className={`absolute inset-0 rounded-3xl overflow-hidden pointer-events-none ${
+          featured
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        }`}
+      >
+        <div
+          className="absolute -inset-full animate-[spin_4s_linear_infinite]"
+          style={{
+            background: featured
+              ? "conic-gradient(from 0deg, transparent 0 340deg, #A855F7 360deg)"
+              : "conic-gradient(from 0deg, transparent 0 340deg, #3B82F6 360deg)",
+          }}
+        />
       </div>
 
-      <div className="flex-1 space-y-4 mb-8">
-        {features.map((feature: string) => (
-          <div
-            key={feature}
-            className="flex items-start gap-3 text-sm text-slate-300"
-          >
-            <CheckCircle2
-              className={`w-4 h-4 shrink-0 mt-0.5 ${featured ? "text-green-400" : "text-slate-500"}`}
-            />
-            {feature}
-          </div>
-        ))}
-      </div>
+      {/* Static Border Fallback / Base border */}
+      <div
+        className={`absolute inset-0 rounded-3xl transition-opacity duration-300 pointer-events-none ${
+          featured
+            ? "border border-purple-500/30 opacity-0 group-hover:opacity-100"
+            : "border border-white/5 opacity-100 group-hover:opacity-0"
+        }`}
+      />
 
-      <Link href={href} className="w-full">
-        <button
-          className={`w-full py-3 rounded-xl font-medium transition-all cursor-pointer ${
+      {/* Card Content Container */}
+      <div
+        className={`relative flex flex-col h-full rounded-[23px] p-8 overflow-hidden transition-colors duration-500 ${
+          featured
+            ? "bg-slate-900/90"
+            : "bg-slate-900/80 group-hover:bg-slate-900/90"
+        }`}
+      >
+        {/* Soft Inner Glow */}
+        <div
+          className={`absolute inset-0 bg-linear-to-b opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${
             featured
-              ? "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/25"
-              : "bg-white/10 hover:bg-white/20 text-white"
+              ? "from-purple-500/10 to-transparent"
+              : "from-blue-500/5 to-transparent"
           }`}
-        >
-          {buttonText}
-        </button>
-      </Link>
+        />
+
+        {featured && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-linear-to-r from-purple-600 to-blue-600 text-white px-4 py-1 rounded-b-xl text-xs font-bold uppercase tracking-wide shadow-lg border-x border-b border-purple-400/30">
+            Most Popular
+          </div>
+        )}
+
+        <div className="mb-8 relative z-10 mt-2">
+          <h3
+            className={`text-lg font-bold mb-2 transition-colors duration-300 ${featured ? "text-purple-300" : "text-slate-300 group-hover:text-blue-300"}`}
+          >
+            {title}
+          </h3>
+          <div className="flex items-baseline gap-1">
+            <span className="text-5xl font-extrabold text-white tracking-tight">
+              {price}
+            </span>
+            {price !== "Custom" && (
+              <span className="text-slate-500 font-medium tracking-wide">
+                /mo
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-400 mt-4 h-10 leading-relaxed font-medium">
+            {description}
+          </p>
+        </div>
+
+        <div className="flex-1 space-y-5 mb-8 relative z-10 mt-4">
+          {features.map((feature: string) => (
+            <div
+              key={feature}
+              className="flex items-start gap-3 text-sm text-slate-300 transition-transform duration-300 group-hover:translate-x-1"
+            >
+              <CheckCircle2
+                className={`w-5 h-5 shrink-0 transition-colors duration-300 ${featured ? "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "text-blue-500/70 group-hover:text-blue-400"}`}
+              />
+              <span className="leading-tight">{feature}</span>
+            </div>
+          ))}
+        </div>
+
+        <Link href={href} className="w-full relative z-10 mt-auto">
+          <button
+            className={`w-full py-4 rounded-xl font-bold transition-all cursor-pointer relative overflow-hidden group/btn ${
+              featured
+                ? "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)]"
+                : "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-blue-500/50"
+            }`}
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              {buttonText}
+              <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 transition-all duration-300 group-hover/btn:opacity-100 group-hover/btn:translate-x-0" />
+            </span>
+            {/* Button Shine Effect */}
+            <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />
+          </button>
+        </Link>
+      </div>
     </motion.div>
   );
 }
