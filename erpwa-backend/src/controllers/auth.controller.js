@@ -1,11 +1,9 @@
 import * as Auth from "../services/auth/auth.service.js";
 
-const isProduction = process.env.NODE_ENV === "production";
-
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  sameSite: isProduction ? "None" : "Lax",
-  secure: isProduction, // true in production (HTTPS)
+  sameSite: "lax",
+  secure: false, // true in production (HTTPS)
   path: "/",
   maxAge: 7 * 24 * 60 * 60 * 1000, // ✅ REQUIRED
 };
@@ -39,16 +37,8 @@ export async function login(req, res) {
 export async function refresh(req, res) {
   const token = req.cookies?.refreshToken;
 
-  // Debug log for cookies
-  console.log(`🔄 REFRESH REQUEST. Cookie Present: ${!!token}`);
   if (!token) {
-    console.log(
-      "❌ REFRESH FAILED: No token in cookies. Cookies received:",
-      Object.keys(req.cookies || {}),
-    );
-  }
-
-  if (!token) {
+    console.log("❌ REFRESH: No token in cookies", req.cookies);
     res.clearCookie("refreshToken", COOKIE_OPTIONS);
     return res.status(401).json({ message: "No token" });
   }

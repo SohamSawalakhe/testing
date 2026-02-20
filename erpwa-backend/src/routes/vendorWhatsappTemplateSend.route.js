@@ -166,28 +166,23 @@ router.post(
         /** 🔹 CAROUSEL */
         if (template.templateType === 'carousel' && template.carouselCards?.length > 0) {
           const carouselCardsPayload = template.carouselCards.map((card, index) => {
-            const cardComponents = [];
-
-            // Only add Header if we have a valid S3 URL
-            if (card.s3Url) {
-              const mediaType = (card.mimeType && card.mimeType.startsWith('video')) ? "VIDEO" : "IMAGE";
-              cardComponents.push({
-                type: "HEADER",
-                parameters: [
-                  {
-                    type: mediaType.toLowerCase(),
-                    [mediaType.toLowerCase()]: {
-                      link: card.s3Url
-                    }
-                  }
-                ]
-              });
-            }
-
+            const mediaType = (card.mimeType && card.mimeType.startsWith('video')) ? "VIDEO" : "IMAGE";
             return {
               card_index: index,
-              components: cardComponents
-            };
+              components: [
+                {
+                  type: "HEADER",
+                  parameters: [
+                    {
+                      type: mediaType.toLowerCase(),
+                      [mediaType.toLowerCase()]: {
+                        link: card.s3Url
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
           });
 
           components.push({

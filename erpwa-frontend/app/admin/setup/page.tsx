@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/authContext";
 import { toast } from "react-toastify";
@@ -18,6 +18,16 @@ export default function WhatsAppSetupPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [setupMethod, setSetupMethod] = useState<SetupMethod>("embedded");
+  const [sdkReady, setSdkReady] = useState(false);
+  const [setupStep, setSetupStep] = useState<string | null>(null);
+
+  // We use a ref to track the session because the cleanup/finish event
+  // might fire *after* the FB.login callback closes over the state,
+  // so state updates wouldn't be visible inside the polling loop.
+  const sessionRef = useRef<{
+    whatsappBusinessId: string;
+    whatsappPhoneNumberId: string;
+  } | null>(null);
 
   const [config, setConfig] = useState<{
     whatsappBusinessId?: string;
@@ -116,10 +126,13 @@ export default function WhatsAppSetupPage() {
         console.log("📩 WA_EMBEDDED_SIGNUP:", payload);
 
         if (payload.event === "FINISH") {
-          setEmbeddedSession({
+          setSetupStep("WhatsApp account received from Meta...");
+          const newSession = {
             whatsappBusinessId: payload.data.waba_id,
             whatsappPhoneNumberId: payload.data.phone_number_id,
-          });
+          };
+          setEmbeddedSession(newSession);
+          sessionRef.current = newSession; // Update Ref for synchronous access
         }
 
         if (payload.event === "ERROR") {
@@ -175,6 +188,7 @@ export default function WhatsAppSetupPage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setSetupStep("Validating WhatsApp credentials...");
 
     try {
       await api.post("/vendor/whatsapp/setup", form);
@@ -197,6 +211,7 @@ export default function WhatsAppSetupPage() {
       setError(error.response?.data?.message || "Setup failed");
     } finally {
       setSaving(false);
+      setSetupStep(null);
     }
   }
 
@@ -210,22 +225,30 @@ export default function WhatsAppSetupPage() {
 
     setSaving(true);
     setError(null);
+    setSetupStep("Opening Meta signup...");
+    setEmbeddedSession(null);
+    sessionRef.current = null; // Clear ref before starting
 
     window.FB.login(
       (response: any) => {
         if (!response.authResponse) {
           setSaving(false);
+          setSetupStep(null);
+          setError(null);
           toast.error("Signup cancelled");
           return;
         }
 
         const code = response.authResponse.code;
 
+        setSetupStep("Receiving WhatsApp account details...");
+
         // ⏳ wait for WA_EMBEDDED_SIGNUP
         const waitForSession = async () => {
-          for (let i = 0; i < 10; i++) {
-            if (embeddedSession) return embeddedSession;
-            await new Promise((r) => setTimeout(r, 300));
+          for (let i = 0; i < 20; i++) {
+            // Check ref instead of state to avoid closure staleness
+            if (sessionRef.current) return sessionRef.current;
+            await new Promise((r) => setTimeout(r, 500));
           }
           return null;
         };
@@ -240,6 +263,7 @@ export default function WhatsAppSetupPage() {
           }
 
           try {
+            setSetupStep("Activating phone number...");
             await api.post("/vendor/whatsapp/embedded-setup", {
               code,
               whatsappBusinessId: session.whatsappBusinessId,
@@ -247,14 +271,29 @@ export default function WhatsAppSetupPage() {
             });
 
             const res = await api.get("/vendor/whatsapp");
+            setSetupStep("Finalizing connection...");
             setConfig(res.data);
             setStatus("connected");
             toast.success("WhatsApp connected successfully");
           } catch (err: any) {
             setStatus("error");
-            setError(err.response?.data?.message || "Embedded signup failed");
+
+            const metaMessage =
+              err.response?.data?.metaError?.error?.message ||
+              err.response?.data?.message;
+
+            if (metaMessage?.includes("register")) {
+              setError("Phone number activation failed. Please retry.");
+            } else if (metaMessage?.includes("permission")) {
+              setError("Required WhatsApp permissions are missing.");
+            } else if (metaMessage?.includes("token")) {
+              setError("Authentication failed. Please reconnect.");
+            } else {
+              setError(metaMessage || "Embedded signup failed");
+            }
           } finally {
             setSaving(false);
+            setSetupStep(null);
           }
         })();
       },
@@ -408,9 +447,31 @@ export default function WhatsAppSetupPage() {
                 </ul>
               </div>
 
+              {embeddedSession && (
+                <div className="bg-muted/30 border border-border rounded-lg p-3 text-sm space-y-1">
+                  <p className="font-medium">✅ Meta Provided:</p>
+                  <p>Business ID: {embeddedSession.whatsappBusinessId}</p>
+                  <p>
+                    Phone Number ID: {embeddedSession.whatsappPhoneNumberId}
+                  </p>
+                </div>
+              )}
+
               {error && (
-                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded p-3">
-                  {error}
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-medium text-destructive">
+                    ❌ Setup Error
+                  </p>
+                  <p className="text-sm text-destructive/90">{error}</p>
+                </div>
+              )}
+
+              {saving && setupStep && (
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-1">
+                  <p className="text-sm font-medium">⚙️ Setup Progress</p>
+                  <p className="text-sm text-muted-foreground animate-pulse">
+                    {setupStep}
+                  </p>
                 </div>
               )}
 
@@ -516,9 +577,21 @@ export default function WhatsAppSetupPage() {
                 />
               </div>
 
+              {saving && setupStep && (
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-1">
+                  <p className="text-sm font-medium">⚙️ Setup Progress</p>
+                  <p className="text-sm text-muted-foreground animate-pulse">
+                    {setupStep}
+                  </p>
+                </div>
+              )}
+
               {error && (
-                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded p-3">
-                  {error}
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-medium text-destructive">
+                    ❌ Setup Error
+                  </p>
+                  <p className="text-sm text-destructive/90">{error}</p>
                 </div>
               )}
 

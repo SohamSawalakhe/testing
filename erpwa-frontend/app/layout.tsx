@@ -13,8 +13,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "GPS erp",
-  description: "Professional sales and support management dashboard",
+  title: "GPSERP",
+  description: "Professional WhatsApp CRM & Sales Dashboard",
 };
 
 export default function RootLayout({
