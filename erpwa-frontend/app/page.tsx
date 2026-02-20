@@ -19,6 +19,7 @@ import { useAuth } from "@/context/authContext";
 import { Logo } from "@/components/logo";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { TestimonialsSection } from "@/components/testimonials";
+import { Marquee } from "@/components/magicui/marquee";
 import { Typewriter } from "@/components/magicui/typewriter";
 
 export default function LandingPage() {
@@ -50,6 +51,7 @@ export default function LandingPage() {
             <NavLink href="#features">Features</NavLink>
             <NavLink href="#workflows">Workflows</NavLink>
             <NavLink href="#pricing">Pricing</NavLink>
+            <NavLink href="#testimonials">Testimonials</NavLink>
           </div>
 
           <div className="flex items-center gap-4">
@@ -66,7 +68,7 @@ export default function LandingPage() {
               <Link href="/login">
                 <button className="relative px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-slate-100 text-slate-950 hover:bg-white transition-all text-xs sm:text-sm font-bold shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_25px_-5px_rgba(255,255,255,0.5)] cursor-pointer overflow-hidden group">
                   <span className="relative z-10 flex items-center gap-2">
-                    Get Started
+                    Start free trial
                   </span>
                   <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/50 to-transparent -translate-x-full group-hover:animate-shimmer" />
                 </button>
@@ -160,7 +162,7 @@ export default function LandingPage() {
 
       {/* Social Proof Marquee */}
       <div className="border-y border-white/5 bg-slate-950/50 backdrop-blur-sm overflow-hidden">
-        <div className="py-10 relative">
+        <div className="relative">
           <div className="absolute left-0 top-0 bottom-0 w-32 bg-linear-to-r from-slate-950 to-transparent z-10" />
           <div className="absolute right-0 top-0 bottom-0 w-32 bg-linear-to-l from-slate-950 to-transparent z-10" />
 
@@ -423,7 +425,7 @@ export default function LandingPage() {
                 "Campaign Broadcasts",
                 "Meta Chat Fees Billed Separately",
               ]}
-              buttonText="Get Started"
+              buttonText="Start free trial"
               href="/login?plan=starter"
               delay={0}
             />
@@ -462,6 +464,7 @@ export default function LandingPage() {
               ]}
               buttonText="Contact Sales"
               href="mailto:sales@gpserp.com"
+              isEnterprise={true}
               delay={0.2}
             />
           </div>
@@ -692,6 +695,7 @@ interface PricingCardProps {
   buttonText: string;
   href: string;
   featured?: boolean;
+  isEnterprise?: boolean;
   delay: number;
 }
 
@@ -703,6 +707,7 @@ function PricingCard({
   buttonText,
   href,
   featured = false,
+  isEnterprise = false,
   delay,
 }: PricingCardProps) {
   return (
@@ -730,7 +735,9 @@ function PricingCard({
           style={{
             background: featured
               ? "conic-gradient(from 0deg, transparent 0 340deg, #A855F7 360deg)"
-              : "conic-gradient(from 0deg, transparent 0 340deg, #3B82F6 360deg)",
+              : isEnterprise
+                ? "conic-gradient(from 0deg, transparent 0 340deg, #10B981 360deg)"
+                : "conic-gradient(from 0deg, transparent 0 340deg, #3B82F6 360deg)",
           }}
         />
       </div>
@@ -757,7 +764,9 @@ function PricingCard({
           className={`absolute inset-0 bg-linear-to-b opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${
             featured
               ? "from-purple-500/10 to-transparent"
-              : "from-blue-500/5 to-transparent"
+              : isEnterprise
+                ? "from-emerald-500/10 to-transparent"
+                : "from-blue-500/5 to-transparent"
           }`}
         />
 
@@ -769,7 +778,13 @@ function PricingCard({
 
         <div className="mb-8 relative z-10 mt-2">
           <h3
-            className={`text-lg font-bold mb-2 transition-colors duration-300 ${featured ? "text-purple-300" : "text-slate-300 group-hover:text-blue-300"}`}
+            className={`text-lg font-bold mb-2 transition-colors duration-300 ${
+              featured
+                ? "text-purple-300"
+                : isEnterprise
+                  ? "text-slate-300 group-hover:text-emerald-400"
+                  : "text-slate-300 group-hover:text-blue-300"
+            }`}
           >
             {title}
           </h3>
@@ -795,7 +810,13 @@ function PricingCard({
               className="flex items-start gap-3 text-sm text-slate-300 transition-transform duration-300 group-hover:translate-x-1"
             >
               <CheckCircle2
-                className={`w-5 h-5 shrink-0 transition-colors duration-300 ${featured ? "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "text-blue-500/70 group-hover:text-blue-400"}`}
+                className={`w-5 h-5 shrink-0 transition-colors duration-300 ${
+                  featured
+                    ? "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                    : isEnterprise
+                      ? "text-emerald-500/70 group-hover:text-emerald-400"
+                      : "text-blue-500/70 group-hover:text-blue-400"
+                }`}
               />
               <span className="leading-tight">{feature}</span>
             </div>
@@ -807,7 +828,9 @@ function PricingCard({
             className={`w-full py-4 rounded-xl font-bold transition-all cursor-pointer relative overflow-hidden group/btn ${
               featured
                 ? "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)]"
-                : "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-blue-500/50"
+                : isEnterprise
+                  ? "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-emerald-500/50"
+                  : "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-blue-500/50"
             }`}
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
@@ -835,80 +858,31 @@ function GridPattern() {
 }
 
 function LogoMarquee() {
-  return (
-    <div className="relative flex overflow-x-hidden group">
-      <div className="animate-marquee whitespace-nowrap flex items-center gap-16 md:gap-24 opacity-50 group-hover:opacity-80 transition-opacity duration-300">
-        {/* First set of logos */}
-        {[
-          "Acme Corp",
-          "GlobalVentures",
-          "Nebula",
-          "Trio",
-          "FoxRun",
-          "Spherule",
-          "NiteLife",
-        ].map((logo) => (
-          <span
-            key={logo}
-            className="text-xl md:text-2xl font-bold font-serif text-slate-300"
-          >
-            {logo}
-          </span>
-        ))}
-        {/* Duplicate set for infinite loop */}
-        {[
-          "Acme Corp",
-          "GlobalVentures",
-          "Nebula",
-          "Trio",
-          "FoxRun",
-          "Spherule",
-          "NiteLife",
-        ].map((logo, i) => (
-          <span
-            key={`${logo}-duplicate-${i}`}
-            className="text-xl md:text-2xl font-bold font-serif text-slate-300"
-          >
-            {logo}
-          </span>
-        ))}
-      </div>
+  const logos = [
+    "Acme Corp",
+    "GlobalVentures",
+    "Nebula",
+    "Trio",
+    "FoxRun",
+    "Spherule",
+    "NiteLife",
+  ];
 
-      <div className="absolute top-0 animate-marquee2 whitespace-nowrap flex items-center gap-16 md:gap-24 opacity-50 group-hover:opacity-80 transition-opacity duration-300 ml-16 md:ml-24">
-        {/* Second set of logos for seamless loop - positioned absolutely to follow */}
-        {[
-          "Acme Corp",
-          "GlobalVentures",
-          "Nebula",
-          "Trio",
-          "FoxRun",
-          "Spherule",
-          "NiteLife",
-        ].map((logo, i) => (
+  return (
+    <div className="relative flex overflow-hidden w-full group py-2">
+      <Marquee
+        pauseOnHover
+        className="[--duration:25s] [--gap:3rem] md:[--gap:4rem]"
+      >
+        {logos.map((logo, i) => (
           <span
-            key={`${logo}-duplicate-2-${i}`}
-            className="text-xl md:text-2xl font-bold font-serif text-slate-300"
+            key={i}
+            className="text-xl md:text-2xl font-bold font-serif text-slate-300 whitespace-nowrap opacity-50 transition-opacity duration-300 group-hover:opacity-80 px-[1rem] md:px-[1.5rem]"
           >
             {logo}
           </span>
         ))}
-        {[
-          "Acme Corp",
-          "GlobalVentures",
-          "Nebula",
-          "Trio",
-          "FoxRun",
-          "Spherule",
-          "NiteLife",
-        ].map((logo, i) => (
-          <span
-            key={`${logo}-duplicate-3-${i}`}
-            className="text-xl md:text-2xl font-bold font-serif text-slate-300"
-          >
-            {logo}
-          </span>
-        ))}
-      </div>
+      </Marquee>
     </div>
   );
 }
