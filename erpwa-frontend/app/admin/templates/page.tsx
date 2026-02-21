@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -1213,7 +1213,7 @@ export default function TemplatesPage() {
                             {t.category}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground/60">
-                            •
+                            â€¢
                           </span>
                           <span className="text-[10px] text-muted-foreground/60">
                             {t.languages[0]?.language}
@@ -1619,7 +1619,7 @@ export default function TemplatesPage() {
                         {(() => {
                           let body = selectedTemplate.languages[0]?.body || "";
                           variables.forEach((val, idx) => {
-                            const placeholder = `{{${idx + 1}}}`;
+                            const placeholder = "{{" + (idx + 1) + "}}";
                             body = body.replace(placeholder, val || placeholder);
                           });
                           return body;
@@ -1653,6 +1653,8 @@ export default function TemplatesPage() {
                         </div>
                       )}
                     </div>
+                    )
+                  }
                   </div>
 
                   {/* Variables Section */}
@@ -1666,7 +1668,7 @@ export default function TemplatesPage() {
                           <div key={idx} className="space-y-1.5">
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] font-medium text-muted-foreground uppercase">
-                                Variable {`{{${idx + 1}}}`}
+                                Variable {"{{" + (idx + 1) + "}}"}
                               </span>
 
                               <div className="flex bg-muted rounded-md p-0.5">
@@ -2475,17 +2477,17 @@ export default function TemplatesPage() {
 
                                             if (json.screens && json.screens.length > 0) {
                                               startScreen = json.screens[0].id;
-                                              console.log(`✅ Auto-fetched first screen from flowJson: ${startScreen}`);
+                                              console.log(`âœ… Auto-fetched first screen from flowJson: ${startScreen}`);
                                             }
                                           } else if ((flow as any).preview?.first_screen) {
                                             startScreen = (flow as any).preview.first_screen;
-                                            console.log(`✅ Auto-fetched first screen from preview: ${startScreen}`);
+                                            console.log(`âœ… Auto-fetched first screen from preview: ${startScreen}`);
                                           }
                                         } catch (e) {
                                           console.warn("Could not auto-fetch screen ID", e);
                                         }
 
-                                        console.log(`🔧 Setting Flow button screen ID to: ${startScreen}`);
+                                        console.log(`ðŸ”§ Setting Flow button screen ID to: ${startScreen}`);
                                         (newButtons[idx] as any).value = startScreen;
                                         (newButtons[idx] as any).navigateScreen = startScreen;
                                       }
@@ -2566,34 +2568,6 @@ export default function TemplatesPage() {
                             {/* Header Media */}
                             {(formData.headerType === "IMAGE" ||
                               formData.headerType === "VIDEO") && (
-                                <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
-                                  {headerPreview ? (
-                                    formData.headerType === "VIDEO" ? (
-                                      <video
-                                        src={headerPreview}
-                                        className="w-full h-full object-contain"
-                                      />
-                                    ) : (
-                                      <img
-                                        src={headerPreview}
-                                        alt="Header"
-                                        className="w-full h-full object-contain"
-                                      />
-                                    )
-                                  ) : (
-                                    <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
-                                      {formData.headerType === "IMAGE" ? (
-                                        <ImageIcon className="w-6 h-6" />
-                                      ) : (
-                                        <Video className="w-6 h-6" />
-                                      )}
-                                      <span className="text-[8px] font-bold uppercase">
-                                        {formData.headerType}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
                                 <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
                                   {headerPreview ? (
                                     formData.headerType === "VIDEO" ? (
