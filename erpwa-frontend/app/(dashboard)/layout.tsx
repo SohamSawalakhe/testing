@@ -23,15 +23,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     if (
-      user.role === "vendor_owner" &&
-      user.onboardingStatus &&
-      user.onboardingStatus !== "activated"
-    ) {
-      router.replace("/register");
-      return;
-    }
-
-    if (
       user.role === "vendor_owner" ||
       user.role === "vendor_admin" ||
       user.role === "owner"
@@ -49,14 +40,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return null;
-
-  if (
-    user.role === "vendor_owner" &&
-    user.onboardingStatus &&
-    user.onboardingStatus !== "activated"
-  ) {
-    return null; // Prevents rendering children while redirect happens
-  }
 
   if (
     user.role === "vendor_owner" ||

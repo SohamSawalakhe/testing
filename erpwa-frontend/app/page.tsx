@@ -27,7 +27,6 @@ export default function LandingPage() {
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
 
-  const dashboardPath = user && (user.role === "vendor_owner" || user.role === "vendor_admin") ? "/admin/dashboard" : "/dashboard";
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 1.05]);
   const heroY = useTransform(scrollYProgress, [0, 0.2], [0, 50]);
 
@@ -62,18 +61,13 @@ export default function LandingPage() {
             ) : user ? (
               <Link
                 href={
-                  user.onboardingStatus !== "activated"
-                    ? "/register"
-                    : user.role === "vendor_owner" ||
-                        user.role === "vendor_admin"
-                      ? "/admin/dashboard"
-                      : "/dashboard"
+                  user.role === "vendor_owner" || user.role === "vendor_admin"
+                    ? "/admin/dashboard"
+                    : "/dashboard"
                 }
               >
                 <button className="group px-5 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-sm font-medium flex items-center gap-2 cursor-pointer backdrop-blur-sm">
-                  {user.onboardingStatus !== "activated"
-                    ? "Start for free"
-                    : "Dashboard"}
+                  Go to Dashboard
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
               </Link>
