@@ -101,7 +101,10 @@ export default function CreateTemplateCampaignModal({
       .get("/vendor/templates")
       .then((res) => {
         const approved = res.data.filter(
-          (t: Template) => t.status === "approved",
+          (t: Template) =>
+            t.status === "approved" &&
+            // Filter out FLOW templates - they can't be used in campaigns
+            !t.buttons?.some((b) => b.type === "FLOW"),
         );
         setTemplates(approved);
       })
