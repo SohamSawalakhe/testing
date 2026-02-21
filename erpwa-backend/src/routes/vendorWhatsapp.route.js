@@ -9,6 +9,97 @@ import { encrypt } from "../utils/encryption.js";
 const router = express.Router();
 
 console.log("✅ vendorWhatsapp routes loaded");
+/**
+ * Helper → Generate PIN
+ */
+const generatePin = () =>
+  Math.floor(100000 + Math.random() * 900000).toString();
+
+/**
+ * Helper → Register Phone Number
+ */
+const registerPhoneNumber = async (phoneNumberId, token) => {
+  const pin = generatePin();
+
+  // ✅ Check current status BEFORE registering
+  const statusResp = await fetch(
+    `https://graph.facebook.com/v24.0/${phoneNumberId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  const statusData = await statusResp.json();
+
+  if (statusData?.code_verification_status === "VERIFIED") {
+    console.log("✅ Number already verified/registered");
+    return { success: true };
+  }
+
+  // 🔥 Only register if truly needed
+  const resp = await fetch(
+    `https://graph.facebook.com/v24.0/${phoneNumberId}/register`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        pin,
+        tier: "prod",
+      }),
+    },
+  );
+
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    // ✅ Already registered → treat as success
+    if (data?.error?.code === 131045) {
+      console.log("✅ Number already registered");
+      return { success: true };
+    }
+
+    return { success: false, error: data };
+  }
+
+  console.log("✅ Number registered");
+  return { success: true };
+};
+
+/**
+ * Helper → Subscribe App
+ */
+const subscribeApp = async (whatsappBusinessId, token) => {
+  const resp = await fetch(
+    `https://graph.facebook.com/v24.0/${whatsappBusinessId}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    if (data?.error?.message?.includes("already subscribed")) {
+      console.log("✅ App already subscribed");
+      return { success: true };
+    }
+
+    return { success: false, error: data };
+  }
+
+  console.log("✅ App subscribed");
+  return { success: true };
+};
 
 /**
  * ===============================
@@ -74,35 +165,6 @@ router.post(
 
 /**
  * ===============================
- * GET EMBEDDED SIGNUP URL
- * ===============================
- * Access: vendor_owner only
- */
-router.get(
-  "/whatsapp/embedded-signup-url",
-  authenticate,
-  requireRoles(["vendor_owner"]),
-  asyncHandler(async (req, res) => {
-    const appId = process.env.META_APP_ID;
-    const redirectUri = process.env.META_OAUTH_REDIRECT_URI;
-
-    if (!appId || !redirectUri) {
-      return res.status(500).json({
-        message: "Meta OAuth configuration is missing",
-      });
-    }
-
-    // Build Meta's embedded signup URL
-    const signupUrl = `https://www.facebook.com/v24.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
-      redirectUri,
-    )}&state=${req.user.vendorId}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code`;
-
-    res.json({ signupUrl });
-  }),
-);
-
-/**
- * ===============================
  * EMBEDDED SIGNUP CALLBACK
  * ===============================
  * Access: vendor_owner only
@@ -113,123 +175,129 @@ router.post(
   authenticate,
   requireRoles(["vendor_owner"]),
   asyncHandler(async (req, res) => {
-    const { code } = req.body;
+    const { code, whatsappBusinessId, whatsappPhoneNumberId } = req.body;
 
-    if (!code) {
+    if (!code || !whatsappBusinessId || !whatsappPhoneNumberId) {
       return res.status(400).json({
-        message: "Authorization code is required",
+        message: "Missing embedded signup data",
       });
     }
 
-    const appId = process.env.META_APP_ID;
-    const appSecret = process.env.META_APP_SECRET;
-    const redirectUri = process.env.META_OAUTH_REDIRECT_URI;
+    // 🔍 Debugging Logs
+    console.log("🔹 Exchanging code for token...");
+    console.log("🔹 App ID:", process.env.META_APP_ID);
+    console.log(
+      "🔹 App Secret (First 5 chars):",
+      process.env.META_APP_SECRET?.substring(0, 5) + "...",
+    );
 
-    if (!appId || !appSecret || !redirectUri) {
-      return res.status(500).json({
-        message: "Meta OAuth configuration is missing",
-      });
-    }
+    const tokenResp = await fetch(
+      "https://graph.facebook.com/v24.0/oauth/access_token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: process.env.META_APP_ID,
+          client_secret: process.env.META_APP_SECRET,
+          // redirect_uri: process.env.META_OAUTH_REDIRECT_URI, // ❌ Often causes mismatch for JS SDK flows
+          code,
+          grant_type: "authorization_code",
+        }),
+      },
+    );
 
-    // 1️⃣ Exchange code for access token
-    const tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&redirect_uri=${encodeURIComponent(
-      redirectUri,
-    )}&code=${code}`;
-
-    const tokenResp = await fetch(tokenUrl);
     const tokenData = await tokenResp.json();
 
     if (!tokenResp.ok || !tokenData.access_token) {
+      console.error("❌ META TOKEN ERROR:", JSON.stringify(tokenData, null, 2));
       return res.status(400).json({
-        message: "Failed to exchange code for access token",
-        metaError: tokenData?.error?.message,
+        message: "Token exchange failed",
+        metaError: tokenData,
+      });
+    }
+
+    if (!tokenData.access_token) {
+      return res.status(400).json({
+        message: "Token exchange failed",
       });
     }
 
     const accessToken = tokenData.access_token;
 
-    // 2️⃣ Get WhatsApp Business Account details
-    const wabaUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${accessToken}&access_token=${appId}|${appSecret}`;
-    const wabaResp = await fetch(wabaUrl);
-    const wabaData = await wabaResp.json();
+    /**
+     * ✅ STEP 1 → Register Phone Number
+     */
+    const registration = await registerPhoneNumber(
+      whatsappPhoneNumberId,
+      accessToken,
+    );
 
-    if (!wabaResp.ok) {
+    if (!registration.success) {
+      await prisma.vendor.update({
+        where: { id: req.user.vendorId },
+        data: {
+          whatsappStatus: "error",
+          whatsappLastError: JSON.stringify(registration.error),
+        },
+      });
+
       return res.status(400).json({
-        message: "Failed to verify access token",
-        metaError: wabaData?.error?.message,
+        message: "Phone number registration failed",
+        metaError: registration.error,
       });
     }
 
-    // 3️⃣ Get WhatsApp Business Accounts associated with this token
-    const accountsUrl = `https://graph.facebook.com/v24.0/me/businesses?access_token=${accessToken}`;
-    const accountsResp = await fetch(accountsUrl);
-    const accountsData = await accountsResp.json();
+    /**
+     * ✅ OPTIONAL → Phone Health Check (Add Here)
+     */
+    const phoneResp = await fetch(
+      `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
 
-    if (
-      !accountsResp.ok ||
-      !accountsData.data ||
-      accountsData.data.length === 0
-    ) {
-      return res.status(400).json({
-        message: "No WhatsApp Business Account found",
-        metaError: accountsData?.error?.message,
-      });
-    }
-
-    // Get the first business account
-    const businessId = accountsData.data[0].id;
-
-    // 4️⃣ Get WhatsApp Business Account ID (WABA)
-    const wabaListUrl = `https://graph.facebook.com/v24.0/${businessId}/owned_whatsapp_business_accounts?access_token=${accessToken}`;
-    const wabaListResp = await fetch(wabaListUrl);
-    const wabaListData = await wabaListResp.json();
-
-    if (
-      !wabaListResp.ok ||
-      !wabaListData.data ||
-      wabaListData.data.length === 0
-    ) {
-      return res.status(400).json({
-        message: "No WhatsApp Business Account found for this business",
-        metaError: wabaListData?.error?.message,
-      });
-    }
-
-    const whatsappBusinessId = wabaListData.data[0].id;
-
-    // 5️⃣ Get Phone Number ID
-    const phoneUrl = `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers?access_token=${accessToken}`;
-    const phoneResp = await fetch(phoneUrl);
     const phoneData = await phoneResp.json();
 
-    if (!phoneResp.ok || !phoneData.data || phoneData.data.length === 0) {
+    console.log("📱 Phone Health:", JSON.stringify(phoneData, null, 2));
+
+    /**
+     * ✅ STEP 2 → Subscribe App
+     */
+    const subscription = await subscribeApp(whatsappBusinessId, accessToken);
+
+    if (!subscription.success) {
+      await prisma.vendor.update({
+        where: { id: req.user.vendorId },
+        data: {
+          whatsappStatus: "error",
+          whatsappLastError: JSON.stringify(subscription.error),
+        },
+      });
+
       return res.status(400).json({
-        message: "No phone number found for this WhatsApp Business Account",
-        metaError: phoneData?.error?.message,
+        message: "Webhook subscription failed",
+        metaError: subscription.error,
       });
     }
 
-    const whatsappPhoneNumberId = phoneData.data[0].id;
-
-    // 6️⃣ Encrypt access token
-    const encryptedToken = encrypt(accessToken);
-
-    // 7️⃣ Save credentials to Vendor
     await prisma.vendor.update({
       where: { id: req.user.vendorId },
       data: {
         whatsappBusinessId,
         whatsappPhoneNumberId,
-        whatsappAccessToken: encryptedToken,
+        whatsappAccessToken: encrypt(accessToken),
         whatsappStatus: "connected",
         whatsappVerifiedAt: new Date(),
         whatsappLastError: null,
       },
     });
 
-    res.json({
-      message: "WhatsApp successfully connected via embedded signup",
-    });
+    res.json({ success: true });
   }),
 );
 

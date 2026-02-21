@@ -8,9 +8,6 @@ import {
   CheckCheck,
   AlertCircle,
   ShoppingBag,
-  Reply,
-  Phone,
-  SquareArrowOutUpRight,
 } from "lucide-react";
 import type { Message, Conversation } from "@/lib/types";
 import { useState, useRef } from "react";
@@ -23,7 +20,6 @@ interface Props {
   onReply: (message: Message) => void;
   setInputValue: (v: string) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  shouldAnimate?: boolean;
 }
 
 // Audio Player Component
@@ -115,10 +111,11 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
               return (
                 <div
                   key={i}
-                  className={`flex-1 rounded-full transition-all ${isFilled
-                    ? "bg-primary"
-                    : "bg-primary/30 hover:bg-primary/40"
-                    }`}
+                  className={`flex-1 rounded-full transition-all ${
+                    isFilled
+                      ? "bg-primary"
+                      : "bg-primary/30 hover:bg-primary/40"
+                  }`}
                   style={{ height: `${height * 3}px`, minWidth: "2px" }}
                 />
               );
@@ -156,9 +153,6 @@ export default function MessageBubble({
   allMessages,
   onOpenMenu,
   onReply,
-  setInputValue,
-  inputRef,
-  shouldAnimate = false,
 }: Props) {
   // Prioritize finding the full message from history.
   // If not found, fall back to the snapshot in `msg.replyTo` but cast/shape it as a Message.
@@ -166,11 +160,11 @@ export default function MessageBubble({
     allMessages.find((m) => m.whatsappMessageId === msg.replyToMessageId) ??
     (msg.replyTo
       ? ({
-        ...msg.replyTo,
-        id: msg.replyToMessageId || "unknown",
-        whatsappMessageId: msg.replyToMessageId,
-        timestamp: "", // Fallback as we don't have the original timestamp
-      } as Message)
+          ...msg.replyTo,
+          id: msg.replyToMessageId || "unknown",
+          whatsappMessageId: msg.replyToMessageId,
+          timestamp: "", // Fallback as we don't have the original timestamp
+        } as Message)
       : undefined);
 
   const cleanText =
@@ -249,10 +243,11 @@ export default function MessageBubble({
   } = {}) => (
     <div className={`flex items-center gap-0.5 select-none ${customClass}`}>
       <span
-        className={`text-[10px] lowercase leading-none ${isOverlay
-          ? "text-white drop-shadow-sm font-medium"
-          : "text-muted-foreground/60"
-          }`}
+        className={`text-[10px] lowercase leading-none ${
+          isOverlay
+            ? "text-white drop-shadow-sm font-medium"
+            : "text-muted-foreground/60"
+        }`}
       >
         {formattedTime}
       </span>
@@ -274,29 +269,39 @@ export default function MessageBubble({
 
   return (
     <motion.div
-      initial={shouldAnimate ? { opacity: 0, y: 20, scale: 0.95 } : false}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className={`flex items-end gap-2 ${msg.sender === "executive" ? "justify-end" : "justify-start"
-        }`}
+      className={`flex items-end gap-2 ${
+        msg.sender === "executive" ? "justify-end" : "justify-start"
+      }`}
     >
       <div
         className={`flex flex-col gap-1
-        ${isImage || isVideo ? "w-fit" : "max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]"}
-        ${msg.outboundPayload?.interactive || msg.template?.buttons
+        ${
+          isImage || isVideo
+            ? "w-fit"
+            : msg.template?.header?.type === "IMAGE" ||
+                msg.template?.header?.type === "VIDEO"
+              ? "w-fit max-w-[280px]"
+              : "max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]"
+        }
+        ${
+          msg.outboundPayload?.interactive || msg.template?.buttons
             ? "min-w-[200px]"
             : isImage || isVideo
               ? ""
               : "min-w-[120px]"
-          }
+        }
         ${msg.template?.templateType === "carousel" || msg.carouselCards?.length ? "overflow-visible" : ""}`}
       >
         {/* MAIN TEXT/MEDIA BUBBLE */}
         <div
           className={`group relative shadow-none overflow-hidden flex flex-col p-0
-          ${msg.sender === "executive"
+          ${
+            msg.sender === "executive"
               ? "bg-wa-outbound rounded-br-none"
               : "bg-wa-inbound rounded-bl-none"
-            }
+          }
           rounded-lg max-w-full`}
         >
           {/* TEMPLATE HEADER (Rich Media) */}
@@ -305,13 +310,10 @@ export default function MessageBubble({
               {msg.template.header.type === "IMAGE" &&
                 msg.template.header.mediaUrl && (
                   <div className="relative">
-                    <Image
+                    <img
                       src={msg.template.header.mediaUrl}
                       alt="Header"
-                      width={600}
-                      height={400}
                       className="w-full h-auto object-cover"
-                      unoptimized
                     />
 
                     {/* ⏰ TIME OVERLAY */}
@@ -376,14 +378,11 @@ export default function MessageBubble({
               <div className="w-fit max-w-[300px]">
                 {/* Image container with padding to create border effect */}
                 <div className="p-1">
-                  <Image
+                  <img
                     src={effectiveMediaUrl}
                     alt="Image"
-                    width={600}
-                    height={400}
                     className={`w-full h-auto object-cover cursor-pointer ${cleanText ? "rounded-t-md" : "rounded-md"}`}
                     onClick={() => window.open(effectiveMediaUrl!, "_blank")}
-                    unoptimized
                   />
                 </div>
 
@@ -513,7 +512,12 @@ export default function MessageBubble({
             {msg.replyToMessageId && repliedMessage && (
               <div
                 className="mx-1 px-3 py-2 bg-black/5 dark:bg-white/10 border-l-4 border-primary rounded flex gap-2 cursor-pointer"
-                onClick={() => onReply?.(repliedMessage)}
+                onClick={() => {
+                  // Only call onReply if repliedMessage is a full Message object (has id and timestamp)
+                  if (isFullMessage(repliedMessage)) {
+                    onReply?.(repliedMessage);
+                  }
+                }}
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-primary mb-1">
@@ -530,12 +534,10 @@ export default function MessageBubble({
                 {repliedMessage.mediaUrl && (
                   <div className="shrink-0 w-12 h-12 rounded bg-muted/20 overflow-hidden">
                     {repliedMessage.mimeType?.startsWith("image/") ? (
-                      <Image
+                      <img
                         src={repliedMessage.mediaUrl}
                         alt="Reply"
-                        fill
-                        className="object-cover"
-                        unoptimized
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -609,21 +611,20 @@ export default function MessageBubble({
         {msg.template?.buttons && msg.template.buttons.length > 0 && (
           <div className="w-full flex flex-col gap-1">
             <div
-              className={`flex gap-1.5 w-full ${msg.template.buttons.length === 2 ? "flex-row" : "flex-col"
-                }`}
+              className={`flex gap-1.5 w-full ${
+                msg.template.buttons.length === 2 ? "flex-row" : "flex-col"
+              }`}
             >
               {msg.template.buttons.map((btn, idx) => (
                 <button
                   key={idx}
-                  className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${msg.sender === "executive"
-                    ? "bg-wa-outbound"
-                    : "bg-wa-inbound"
-                    }`}
+                  className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 ${
+                    msg.sender === "executive"
+                      ? "bg-wa-outbound"
+                      : "bg-wa-inbound"
+                  }`}
                   onClick={() => {
-                    if (
-                      (btn.type === "URL" || btn.type === "url") &&
-                      btn.value
-                    ) {
+                    if (btn.type === "URL" && btn.value) {
                       window.open(btn.value, "_blank");
                     }
                   }}
@@ -633,12 +634,12 @@ export default function MessageBubble({
                   )}
                   {(btn.type === "PHONE_NUMBER" ||
                     btn.type === "phone_number") && (
-                      <Phone className="w-4 h-4" />
-                    )}
+                    <Phone className="w-4 h-4" />
+                  )}
                   {(btn.type === "QUICK_REPLY" ||
                     btn.type === "quick_reply") && (
-                      <Reply className="w-4 h-4" />
-                    )}
+                    <Reply className="w-4 h-4" />
+                  )}
                   {btn.text}
                 </button>
               ))}
@@ -667,7 +668,7 @@ export default function MessageBubble({
             };
 
             return (
-              <div className="relative group/carousel">
+              <div className="relative mt-2 group/carousel">
                 {/* Left Navigation Button */}
                 {showNavButtons && (
                   <button
@@ -737,12 +738,10 @@ export default function MessageBubble({
                                   controls={false}
                                 />
                               ) : (
-                                <Image
-                                  src={card.mediaUrl || card.s3Url || ""}
-                                  alt={card.title || "Card Image"}
-                                  fill
-                                  className="object-cover"
-                                  unoptimized
+                                <img
+                                  src={card.mediaUrl || card.s3Url}
+                                  alt={card.title}
+                                  className="w-full h-full object-cover"
                                 />
                               )}
                             </div>
@@ -751,8 +750,8 @@ export default function MessageBubble({
 
                         {/* Card Text (Body) */}
                         {card.title && (
-                          <div className="px-2 py-1.5">
-                            <p className="text-[14px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[18px] line-clamp-2 font-medium">
+                          <div className="px-2 py-1">
+                            <p className="text-[12px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[16px] line-clamp-2">
                               {card.title}
                             </p>
                           </div>
@@ -770,20 +769,13 @@ export default function MessageBubble({
 
                       {/* Reply Button - Separate from bubble */}
                       <button
-                        className="w-full py-2 text-[12px] text-[#00a884] dark:text-[#53bdeb] font-medium bg-wa-outbound rounded-lg hover:bg-wa-outbound/90 transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2 text-[12px] text-[#00a884] dark:text-[#53bdeb] font-medium bg-wa-outbound rounded-lg hover:bg-wa-outbound/90 transition-colors"
                         onClick={() => {
                           if (card.buttonType === "URL" && card.buttonValue) {
                             window.open(card.buttonValue, "_blank");
                           }
                         }}
                       >
-                        {card.buttonType === "URL" ? (
-                          <SquareArrowOutUpRight size={14} />
-                        ) : card.buttonType === "PHONE_NUMBER" ? (
-                          <Phone size={14} />
-                        ) : (
-                          <Reply size={14} />
-                        )}
                         {card.buttonText || "Reply"}
                       </button>
                     </div>
@@ -797,26 +789,28 @@ export default function MessageBubble({
         {msg.template?.templateType === "catalog" &&
           msg.template.catalogProducts &&
           msg.template.catalogProducts.length > 0 && (
-            <div className="w-full p-2 bg-wa-inbound rounded-xl border border-border/50 overflow-hidden">
+            <div className="w-full mt-2 p-2 bg-wa-inbound rounded-xl border border-border/50 overflow-hidden">
               <div className="grid grid-cols-2 gap-2">
-                {msg.template.catalogProducts.map((prod, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-background rounded-lg p-2 border border-border/50 flex flex-col gap-1"
-                  >
-                    <div className="relative w-full aspect-square bg-muted/20 rounded mb-1">
-                      {prod.productId ? (
-                        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                          {/* Placeholder since we don't have catalog image fetcher yet */}
-                          <ShoppingBag className="w-6 h-6 opacity-20" />
-                        </div>
-                      ) : null}
+                {msg.template.catalogProducts
+                  .slice(0, 4)
+                  .map((product, idx) => (
+                    <div
+                      key={idx}
+                      className="aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden group border border-border/20"
+                    >
+                      <div className="relative w-full aspect-square bg-muted/20 rounded mb-1">
+                        {prod.productId ? (
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                            {/* Placeholder since we don't have catalog image fetcher yet */}
+                            <ShoppingBag className="w-6 h-6 opacity-20" />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="font-medium text-xs truncate">
+                        Code: {prod.productId}
+                      </div>
                     </div>
-                    <div className="font-medium text-xs truncate">
-                      Code: {prod.productId}
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
               {msg.template.catalogProducts.length > 4 && (
                 <div className="text-center mt-2.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-widest bg-muted/50 py-1 rounded">
@@ -837,10 +831,11 @@ export default function MessageBubble({
           msg.outboundPayload.interactive.type === "list" && (
             <div className="w-full">
               <button
-                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${msg.sender === "executive"
-                  ? "bg-wa-outbound"
-                  : "bg-wa-inbound"
-                  }`}
+                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${
+                  msg.sender === "executive"
+                    ? "bg-wa-outbound"
+                    : "bg-wa-inbound"
+                }`}
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -866,10 +861,11 @@ export default function MessageBubble({
           msg.outboundPayload.interactive.type === "button" && (
             <div className="w-full flex flex-col gap-1">
               <div
-                className={`flex gap-1.5 w-full ${msg.outboundPayload.interactive.action?.buttons?.length === 2
-                  ? "flex-row"
-                  : "flex-col"
-                  }`}
+                className={`flex gap-1.5 w-full ${
+                  msg.outboundPayload.interactive.action?.buttons?.length === 2
+                    ? "flex-row"
+                    : "flex-col"
+                }`}
               >
                 {msg.outboundPayload.interactive.action?.buttons?.map(
                   (
@@ -878,10 +874,11 @@ export default function MessageBubble({
                   ) => (
                     <button
                       key={idx}
-                      className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${msg.sender === "executive"
-                        ? "bg-wa-outbound"
-                        : "bg-wa-inbound"
-                        }`}
+                      className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${
+                        msg.sender === "executive"
+                          ? "bg-wa-outbound"
+                          : "bg-wa-inbound"
+                      }`}
                     >
                       <Reply className="w-4 h-4" />
                       {btn.reply?.title}
@@ -897,10 +894,11 @@ export default function MessageBubble({
           msg.outboundPayload.interactive.type === "cta_url" && (
             <div className="w-full">
               <button
-                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 border border-black/5 dark:border-white/5 ${msg.sender === "executive"
-                  ? "bg-wa-outbound"
-                  : "bg-wa-inbound"
-                  }`}
+                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 border border-black/5 dark:border-white/5 ${
+                  msg.sender === "executive"
+                    ? "bg-wa-outbound"
+                    : "bg-wa-inbound"
+                }`}
                 onClick={() => {
                   const url =
                     msg.outboundPayload?.interactive?.action?.parameters?.url;

@@ -8,36 +8,21 @@ import {
   Plus,
   GripVertical,
   Disc,
+  Link,
   Phone,
-  SquareArrowOutUpRight,
+  MessageCircle,
   AlertTriangle,
   X,
   Copy,
-  Reply,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/card";
 import { Button } from "@/components/button";
 
-interface ButtonData {
-  id?: string;
-  text: string;
-  type?: "reply" | "url" | "phone_number";
-  value?: string;
-}
-
-interface ButtonNodeData {
-  label?: string;
-  buttons?: ButtonData[];
-}
-
-const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
+const ButtonNode = ({ id, data, selected }: NodeProps) => {
   const { setNodes, getNodes } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [localData, setLocalData] = useState<{
-    label: string;
-    buttons: ButtonData[];
-  }>({
+  const [localData, setLocalData] = useState({
     label: data.label || "Buttons Message",
     buttons: data.buttons || [],
   });
@@ -67,7 +52,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
       data: {
         ...currentNode.data,
         label: localData.label,
-        buttons: localData.buttons.map((btn) => ({
+        buttons: localData.buttons.map((btn: any) => ({
           ...btn,
           id: Date.now().toString() + Math.random(),
         })),
@@ -196,7 +181,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
                 <label className="text-[10px] font-bold text-gray-400 uppercase">
                   Buttons ({localData.buttons.length}/3)
                 </label>
-                {localData.buttons.map((btn, idx) => (
+                {localData.buttons.map((btn: any, idx: number) => (
                   <div
                     key={idx}
                     className="space-y-2 bg-gray-50 dark:bg-slate-900 p-2 rounded-md border border-gray-100 dark:border-slate-700"
@@ -206,10 +191,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
                       <select
                         value={btn.type || "reply"}
                         onChange={(e) =>
-                          updateButtonType(
-                            idx,
-                            e.target.value as "reply" | "url" | "phone_number",
-                          )
+                          updateButtonType(idx, e.target.value as any)
                         }
                         className="text-[10px] bg-white dark:bg-slate-800 dark:text-gray-200 border border-gray-200 dark:border-slate-600 rounded px-1 py-1 focus:ring-1 focus:ring-orange-500 outline-none"
                       >
@@ -234,10 +216,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
 
                     {btn.type === "url" && (
                       <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1">
-                        <SquareArrowOutUpRight
-                          size={10}
-                          className="text-gray-400"
-                        />
+                        <Link size={10} className="text-gray-400" />
                         <input
                           value={btn.value || ""}
                           onChange={(e) =>
@@ -291,7 +270,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
               </div>
 
               <div className="space-y-1.5 mt-2">
-                {data.buttons?.map((btn, idx) => {
+                {data.buttons?.map((btn: any, idx: number) => {
                   const isUrl = btn.type === "url";
                   const isPhone = btn.type === "phone_number";
                   const LinkComponent = isUrl || isPhone ? "a" : "div";
@@ -318,17 +297,12 @@ const ButtonNode = ({ id, data, selected }: NodeProps<ButtonNodeData>) => {
                         }
                       }}
                     >
-                      {isUrl && (
-                        <SquareArrowOutUpRight
-                          size={14}
-                          className="text-blue-500"
-                        />
-                      )}
+                      {isUrl && <Link size={10} className="text-blue-500" />}
                       {isPhone && (
-                        <Phone size={14} className="text-green-500" />
+                        <Phone size={10} className="text-green-500" />
                       )}
                       {(!btn.type || btn.type === "reply") && (
-                        <Reply size={14} className="text-gray-400" />
+                        <MessageCircle size={10} className="text-gray-400" />
                       )}
                       <span>{btn.text}</span>
 

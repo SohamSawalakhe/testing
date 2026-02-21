@@ -12,14 +12,13 @@ import {
   Search,
   Image as ImageIcon,
   ArrowLeft,
+  MessageSquareIcon,
   ChevronRight,
-  MessageSquare,
   Loader2,
+  Globe,
   Phone,
   ShoppingBag,
   Layers,
-  Reply,
-  SquareArrowOutUpRight,
 } from "lucide-react";
 import type { Category, Contact } from "@/lib/types";
 
@@ -49,17 +48,6 @@ interface Template {
     value?: string;
   }[];
   templateType?: string;
-  carouselCards?: {
-    id: string;
-    title: string;
-    subtitle: string;
-    s3Url: string | null;
-    mimeType: string | null;
-    buttonText?: string;
-    buttonValue?: string;
-    buttonType?: string;
-    position: number;
-  }[];
 }
 
 export default function CreateTemplateCampaignModal({
@@ -311,7 +299,7 @@ export default function CreateTemplateCampaignModal({
                       </div>
                     ) : templates.length === 0 ? (
                       <div className="text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed border-border">
-                        <MessageSquare className="w-12 h-12 mx-auto mb-12 text-muted-foreground opacity-20" />
+                        <MessageSquareIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-20" />
                         <p className="text-sm text-muted-foreground font-medium">
                           No approved templates found
                         </p>
@@ -743,13 +731,12 @@ export default function CreateTemplateCampaignModal({
                                 );
                                 if (mediaItem?.s3Url) {
                                   return (
-                                  <div className="rounded-xl overflow-hidden bg-black/40 min-h-35 relative group flex items-center justify-center">
+                                    <div className="rounded-xl overflow-hidden bg-black/40 min-h-35 relative group flex items-center justify-center">
                                       {selectedTemplate.languages[0]
                                         .headerType === "VIDEO" ? (
                                         <video
                                           src={mediaItem.s3Url}
                                           className="w-full h-full object-contain"
-                                          controls
                                         />
                                       ) : (
                                         <Image
@@ -813,11 +800,11 @@ export default function CreateTemplateCampaignModal({
                                       className="p-2.5 text-center text-[13px] font-medium text-[#00a884] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors cursor-pointer"
                                     >
                                       {btn.type === "URL" ? (
-                                        <SquareArrowOutUpRight className="w-3.5 h-3.5" />
+                                        <Globe className="w-3.5 h-3.5" />
                                       ) : btn.type === "PHONE_NUMBER" ? (
                                         <Phone className="w-3.5 h-3.5" />
                                       ) : (
-                                        <Reply className="w-3.5 h-3.5" />
+                                        <MessageSquareIcon className="w-3.5 h-3.5" />
                                       )}
                                       {btn.text}
                                     </div>
