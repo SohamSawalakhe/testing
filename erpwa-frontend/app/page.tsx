@@ -58,14 +58,25 @@ export default function LandingPage() {
             {loading ? (
               <div className="h-10 w-28 bg-white/5 animate-pulse rounded-full" />
             ) : user ? (
-              <Link href="/dashboard">
+              <Link
+                href={
+                  user.onboardingStatus !== "activated"
+                    ? "/register"
+                    : user.role === "vendor_owner" ||
+                        user.role === "vendor_admin"
+                      ? "/admin/dashboard"
+                      : "/dashboard"
+                }
+              >
                 <button className="group px-5 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-sm font-medium flex items-center gap-2 cursor-pointer backdrop-blur-sm">
-                  Dashboard
+                  {user.onboardingStatus !== "activated"
+                    ? "Start for free"
+                    : "Dashboard"}
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
               </Link>
             ) : (
-              <Link href="/login">
+              <Link href="/register">
                 <button className="relative px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-slate-100 text-slate-950 hover:bg-white transition-all text-xs sm:text-sm font-bold shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_25px_-5px_rgba(255,255,255,0.5)] cursor-pointer overflow-hidden group">
                   <span className="relative z-10 flex items-center gap-2">
                     Start free trial
@@ -142,12 +153,9 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-4 px-6 sm:px-0"
           >
-            <Link
-              href={user ? "/dashboard" : "/login"}
-              className="w-full sm:w-auto"
-            >
+            <Link href="/register" className="w-full sm:w-auto">
               <button className="w-full sm:w-auto h-14 px-8 rounded-full bg-white text-slate-950 font-bold text-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]">
-                Start for free <Zap className="w-5 h-5 fill-slate-950" />
+                Get Started <Zap className="w-5 h-5 fill-slate-950" />
               </button>
             </Link>
             <button className="w-full sm:w-auto h-14 px-8 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-lg font-bold transition-all flex items-center justify-center gap-3 cursor-pointer backdrop-blur-sm group">
@@ -426,7 +434,7 @@ export default function LandingPage() {
                 "Meta Chat Fees Billed Separately",
               ]}
               buttonText="Start free trial"
-              href="/login?plan=starter"
+              href="/register?plan=starter"
               delay={0}
             />
 
@@ -444,7 +452,7 @@ export default function LandingPage() {
                 "Meta Chat Fees Billed Separately",
               ]}
               buttonText="Start Free Trial"
-              href="/login?plan=pro"
+              href="/register?plan=pro"
               featured={true}
               delay={0.1}
             />
