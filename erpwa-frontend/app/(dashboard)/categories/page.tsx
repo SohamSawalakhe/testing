@@ -5,18 +5,16 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/card";
 import { Badge } from "@/components/badge";
+import { Card, CardHeader, CardContent } from "@/components/card";
+import { Badge } from "@/components/badge";
 import {
   Plus,
   Edit2,
   Trash2,
-  Eye,
-  EyeOff,
   X,
   FolderOpen,
-  Check,
   AlertTriangle,
   Search,
-  Filter,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -88,7 +86,6 @@ export default function CategoriesPage() {
   );
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactCount, setContactCount] = useState(0);
-  const [loading, setLoading] = useState(true);
 
   // Search, filter, sort, and pagination states
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,24 +152,29 @@ export default function CategoriesPage() {
     loadCategories();
     // Load all contacts on initial page load
     loadContactDetails();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Load contacts whenever category/subcategory selection changes
     loadContactDetails();
-  }, [selectedCategory, selectedSubcategory]);
+  }, [selectedCategory, selectedSubcategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadCategories = async () => {
     try {
       const response = await categoriesAPI.list();
       setCategories(response.data || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(
         "Failed to load categories: " +
-          (error.response?.data?.error || error.message),
+          ((
+            error as {
+              response?: { data?: { error?: string } };
+              message?: string;
+            }
+          ).response?.data?.error || (error as { message?: string }).message),
       );
     } finally {
-      setLoading(false);
+      // Loading state handled by initial load
     }
   };
 
@@ -198,9 +200,9 @@ export default function CategoriesPage() {
         hasValidSubcategory ? selectedSubcategory : undefined,
       );
       // API returns { data: { count, contacts } }
-      const count = (response.data as any)?.count ?? 0;
+      const count = (response.data as { count?: number })?.count ?? 0;
       setContactCount(count);
-    } catch (error: any) {
+    } catch (error) {
       // API wrapper now never throws, but just in case
       console.error("Failed to load contact count:", error);
       setContactCount(0);
@@ -228,7 +230,7 @@ export default function CategoriesPage() {
       const count = response.data?.count ?? contacts.length;
       setContacts(contacts);
       setContactCount(count);
-    } catch (error: any) {
+    } catch (error) {
       // API wrapper now never throws, but just in case
       console.error("Failed to load contacts:", error);
       setContacts([]);
@@ -292,11 +294,26 @@ export default function CategoriesPage() {
       } else {
         toast.error("Failed to create category");
       }
-    } catch (error: any) {
+    } catch (error) {
       const errorMsg =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
+        (
+          error as {
+            response?: { data?: { error?: string; message?: string } };
+            message?: string;
+          }
+        ).response?.data?.error ||
+        (
+          error as {
+            response?: { data?: { error?: string; message?: string } };
+            message?: string;
+          }
+        ).response?.data?.message ||
+        (
+          error as {
+            response?: { data?: { error?: string; message?: string } };
+            message?: string;
+          }
+        ).message ||
         "Failed to create category";
       toast.error(errorMsg);
       console.error("Category creation error:", error);
@@ -364,8 +381,18 @@ export default function CategoriesPage() {
       } else {
         toast.error(response.data.error || "Failed to delete category");
       }
-    } catch (error: any) {
-      let errorData = error.response?.data;
+    } catch (error) {
+      let errorData = (error as { response?: { data?: unknown } }).response
+        ?.data as
+        | {
+            requires_cascade?: boolean;
+            images_count?: number;
+            contacts_count?: number;
+            leads_count?: number;
+            subcategories_count?: number;
+            error?: string;
+          }
+        | undefined;
       if (typeof errorData === "string") {
         try {
           errorData = JSON.parse(errorData);
@@ -437,8 +464,11 @@ export default function CategoriesPage() {
           setSelectedSubcategory(null);
         }
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Failed to delete category");
+    } catch (error) {
+      toast.error(
+        (error as { response?: { data?: { error?: string } } }).response?.data
+          ?.error || "Failed to delete category",
+      );
     }
   };
 
@@ -448,38 +478,39 @@ export default function CategoriesPage() {
       toast.success("Contact deleted successfully!");
       await loadContactDetails();
       await loadContactCount();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Failed to delete contact");
+    } catch (error) {
+      toast.error(
+        (error as { response?: { data?: { error?: string } } }).response?.data
+          ?.error || "Failed to delete contact",
+      );
     }
   };
 
-  const handleUpdateContactStatus = async (
-    contactId: number,
-    status: string,
-  ) => {
-    try {
-      const formData = new FormData();
-      formData.append("status", status);
-
-      const response = await categoriesAPI.updateContact(contactId, formData);
-
-      if (response.data?.success !== false) {
-        toast.success("Contact updated successfully!");
-        await loadContactDetails();
-        await loadContactCount();
-      } else {
-        toast.error("Failed to update contact");
-      }
-    } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to update contact";
-      toast.error(errorMsg);
-      console.error("Contact update error:", error);
-    }
-  };
+  // Unused function - kept for future implementation
+  // const handleUpdateContactStatus = async (contactId: number, status: string) => {
+  //   try {
+  //     const formData = new FormData()
+  //     formData.append("status", status)
+  //
+  //     const response = await categoriesAPI.updateContact(contactId, formData)
+  //
+  //     if (response.data?.success !== false) {
+  //       toast.success("Contact updated successfully!")
+  //       await loadContactDetails()
+  //       await loadContactCount()
+  //     } else {
+  //       toast.error("Failed to update contact")
+  //     }
+  //   } catch (error) {
+  //     const errorMsg =
+  //       (error as {response?: {data?: {error?: string; message?: string}}; message?: string}).response?.data?.error ||
+  //       (error as {response?: {data?: {error?: string; message?: string}}; message?: string}).response?.data?.message ||
+  //       (error as {response?: {data?: {error?: string; message?: string}}; message?: string}).message ||
+  //       "Failed to update contact"
+  //     toast.error(errorMsg)
+  //     console.error("Contact update error:", error)
+  //   }
+  // }
 
   const selectedCategoryData = categories.find(
     (c) => c.id === selectedCategory,
@@ -872,7 +903,7 @@ export default function CategoriesPage() {
                 {/* Sort and Clear Filters */}
                 <div className="flex flex-wrap gap-2 items-center">
                   {/* Sort */}
-                  <div className="w-[200px]">
+                  <div className="w-50">
                     <Select
                       value={`${sortBy}:${sortOrder}`}
                       onChange={(e) => {
@@ -944,32 +975,42 @@ export default function CategoriesPage() {
                 }
 
                 // Sort contacts
-                filteredContacts.sort((a: any, b: any) => {
-                  const aValue = a[sortBy] || "";
-                  const bValue = b[sortBy] || "";
+                (
+                  filteredContacts as unknown as Array<Record<string, unknown>>
+                ).sort(
+                  (a: Record<string, unknown>, b: Record<string, unknown>) => {
+                    const aValue = a[sortBy] || "";
+                    const bValue = b[sortBy] || "";
 
-                  // Handle date sorting for created_at
-                  if (sortBy === "created_at") {
-                    const aDate = aValue ? new Date(aValue).getTime() : 0;
-                    const bDate = bValue ? new Date(bValue).getTime() : 0;
-                    return sortOrder === "asc" ? aDate - bDate : bDate - aDate;
-                  }
+                    // Handle date sorting for created_at
+                    if (sortBy === "created_at") {
+                      const aDate = aValue
+                        ? new Date(aValue as string).getTime()
+                        : 0;
+                      const bDate = bValue
+                        ? new Date(bValue as string).getTime()
+                        : 0;
+                      return sortOrder === "asc"
+                        ? aDate - bDate
+                        : bDate - aDate;
+                    }
 
-                  // Handle string sorting
-                  if (
-                    typeof aValue === "string" &&
-                    typeof bValue === "string"
-                  ) {
+                    // Handle string sorting
+                    if (
+                      typeof aValue === "string" &&
+                      typeof bValue === "string"
+                    ) {
+                      return sortOrder === "asc"
+                        ? aValue.localeCompare(bValue)
+                        : bValue.localeCompare(aValue);
+                    }
+
+                    // Handle numeric sorting
                     return sortOrder === "asc"
-                      ? aValue.localeCompare(bValue)
-                      : bValue.localeCompare(aValue);
-                  }
-
-                  // Handle numeric sorting
-                  return sortOrder === "asc"
-                    ? aValue - bValue
-                    : bValue - aValue;
-                });
+                      ? Number(aValue) - Number(bValue)
+                      : Number(bValue) - Number(aValue);
+                  },
+                );
 
                 // Pagination
                 const totalPages = Math.ceil(
@@ -1012,60 +1053,82 @@ export default function CategoriesPage() {
                         </thead>
                         <tbody>
                           {paginatedContacts && paginatedContacts.length > 0 ? (
-                            paginatedContacts.map((contact: any) => (
+                            (
+                              paginatedContacts as unknown as Array<
+                                Record<string, unknown>
+                              >
+                            ).map((contact: Record<string, unknown>) => (
                               <tr
                                 key={
-                                  contact.id ||
+                                  String(contact.id) ||
                                   `${contact.mobile_number}-${contact.company_name}`
                                 }
                                 className="border-b border-border hover:bg-muted/30"
                               >
                                 <td className="py-3 px-4">
-                                  <CoolTooltip content={contact.company_name}>
-                                    <div className="truncate max-w-[150px] text-foreground">
-                                      {contact.company_name || "--"}
+                                  <CoolTooltip
+                                    content={String(contact.company_name || "")}
+                                  >
+                                    <div className="truncate max-w-37.5 text-foreground">
+                                      {String(contact.company_name || "--")}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4">
-                                  <CoolTooltip content={contact.mobile_number}>
-                                    <div className="truncate max-w-[150px] text-muted-foreground">
-                                      {contact.mobile_number || "--"}
-                                    </div>
-                                  </CoolTooltip>
-                                </td>
-                                <td className="py-3 px-4 hidden md:table-cell">
-                                  <CoolTooltip content={contact.category_name}>
-                                    <div className="truncate max-w-[150px] text-foreground">
-                                      {contact.category_name || "--"}
+                                  <CoolTooltip
+                                    content={String(
+                                      contact.mobile_number || "",
+                                    )}
+                                  >
+                                    <div className="truncate max-w-37.5 text-muted-foreground">
+                                      {String(contact.mobile_number || "--")}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4 hidden md:table-cell">
                                   <CoolTooltip
-                                    content={contact.sub_category_name}
+                                    content={String(
+                                      contact.category_name || "",
+                                    )}
                                   >
-                                    <div className="truncate max-w-[150px] text-foreground">
-                                      {contact.sub_category_name || "--"}
+                                    <div className="truncate max-w-37.5 text-foreground">
+                                      {String(contact.category_name || "--")}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4 hidden md:table-cell">
                                   <CoolTooltip
-                                    content={contact.sales_person_name}
+                                    content={String(
+                                      contact.sub_category_name || "",
+                                    )}
                                   >
-                                    <div className="truncate max-w-[150px] text-foreground">
-                                      {contact.sales_person_name || "--"}
+                                    <div className="truncate max-w-37.5 text-foreground">
+                                      {String(
+                                        contact.sub_category_name || "--",
+                                      )}
+                                    </div>
+                                  </CoolTooltip>
+                                </td>
+                                <td className="py-3 px-4 hidden md:table-cell">
+                                  <CoolTooltip
+                                    content={String(
+                                      contact.sales_person_name || "",
+                                    )}
+                                  >
+                                    <div className="truncate max-w-37.5 text-foreground">
+                                      {String(
+                                        contact.sales_person_name || "--",
+                                      )}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4">
                                   <StatusBadge
-                                    status={
+                                    status={String(
                                       contact.status ||
-                                      (contact.is_lead ? "new" : "pending")
-                                    }
-                                    isLead={contact.is_lead}
+                                        (contact.is_lead ? "new" : "pending"),
+                                    )}
+                                    isLead={Boolean(contact.is_lead)}
                                   />
                                 </td>
                                 <td className="py-3 px-4 text-right">
@@ -1080,8 +1143,11 @@ export default function CategoriesPage() {
                                         onClick={() => {
                                           if (contact.id) {
                                             handleDeleteContact(
-                                              contact.id,
-                                              contact.company_name || "contact",
+                                              Number(contact.id),
+                                              String(
+                                                contact.company_name ||
+                                                  "contact",
+                                              ),
                                             );
                                           } else {
                                             toast.error(
@@ -1182,7 +1248,7 @@ export default function CategoriesPage() {
                           <span className="text-sm text-muted-foreground">
                             Rows:
                           </span>
-                          <div className="w-[70px]">
+                          <div className="w-17.5">
                             <Select
                               value={itemsPerPage.toString()}
                               onChange={(e) => {
@@ -1254,11 +1320,32 @@ export default function CategoriesPage() {
                     } else {
                       toast.error("Failed to update category");
                     }
-                  } catch (error: any) {
+                  } catch (error) {
                     const errorMsg =
-                      error.response?.data?.error ||
-                      error.response?.data?.message ||
-                      error.message ||
+                      (
+                        error as {
+                          response?: {
+                            data?: { error?: string; message?: string };
+                          };
+                          message?: string;
+                        }
+                      ).response?.data?.error ||
+                      (
+                        error as {
+                          response?: {
+                            data?: { error?: string; message?: string };
+                          };
+                          message?: string;
+                        }
+                      ).response?.data?.message ||
+                      (
+                        error as {
+                          response?: {
+                            data?: { error?: string; message?: string };
+                          };
+                          message?: string;
+                        }
+                      ).message ||
                       "Failed to update category";
                     toast.error(errorMsg);
                     console.error("Category update error:", error);
@@ -1322,7 +1409,7 @@ export default function CategoriesPage() {
             <CardContent>
               <div className="space-y-4">
                 <p className="text-foreground">
-                  Category "{cascadeDeleteModal.categoryName}" has:
+                  Category &quot;{cascadeDeleteModal.categoryName}&quot; has:
                   {cascadeDeleteModal.subcategoriesCount > 0 && (
                     <>
                       <br />- {cascadeDeleteModal.subcategoriesCount}{" "}
@@ -1403,9 +1490,9 @@ export default function CategoriesPage() {
                         const checkboxes = document.querySelectorAll(
                           '.cascade-checkbox input[type="checkbox"]',
                         );
-                        checkboxes.forEach((cb: any) => {
-                          // Only check if enabled
-                          if (!cb.disabled) cb.checked = checked;
+                        checkboxes.forEach((cb: Element) => {
+                          const input = cb as HTMLInputElement;
+                          if (!input.disabled) input.checked = checked;
                         });
                       }}
                     />
@@ -1456,8 +1543,8 @@ export default function CategoriesPage() {
             <CardContent>
               <p className="text-foreground mb-6">
                 Are you sure you want to delete{" "}
-                {deleteConf.type === "category" ? "category" : "contact"} "
-                {deleteConf.title}"?
+                {deleteConf.type === "category" ? "category" : "contact"} &quot;
+                {deleteConf.title}&quot;?
                 <br />
                 <span className="text-sm text-muted-foreground mt-2 block">
                   This action cannot be undone.

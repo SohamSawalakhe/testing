@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import { Button } from "@/components/button";
@@ -33,7 +33,6 @@ import {
   Users,
   Eye,
   ShoppingBag,
-  Workflow,
   LayoutGrid,
   BookTemplate,
 } from "lucide-react";
@@ -97,6 +96,7 @@ type Template = {
 
 export default function TemplatesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -137,9 +137,8 @@ export default function TemplatesPage() {
 
   const [headerFile, setHeaderFile] = useState<File | null>(null);
   const [headerPreview, setHeaderPreview] = useState<string | null>(null);
-  const [flows, setFlows] = useState<any[]>([]);
   const [buttons, setButtons] = useState<
-    { type: string; text: string; value?: string; flowId?: string; flowAction?: string }[]
+    { type: string; text: string; value?: string }[]
   >([]);
 
   // --- Catalog Template Modal State ---
@@ -180,15 +179,10 @@ export default function TemplatesPage() {
   const fetchTemplates = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [localRes, metaRes, flowsRes] = await Promise.all([
+      const [localRes, metaRes] = await Promise.all([
         api.get("/vendor/templates"),
         api.get("/vendor/templates/meta").catch(() => ({ data: [] })),
-        api.get("/whatsapp/flows").catch(() => ({ data: { flows: [] } }))
       ]);
-
-      if (flowsRes.data?.flows) {
-        setFlows(flowsRes.data.flows);
-      }
 
       const localTemplates = localRes.data;
       const metaRaw = metaRes.data || [];
@@ -205,7 +199,10 @@ export default function TemplatesPage() {
         (m: any) => !localNames.has(m.originalName)
       );
 
-      const merged = [...localTemplates, ...uniqueMetaTemplates];
+      // Filter out FLOW templates as they belong in the Flow Templates page
+      const merged = [...localTemplates, ...uniqueMetaTemplates].filter(
+        (t: any) => !t.buttons?.some((b: any) => b.type === "FLOW"),
+      );
       setTemplates(merged);
     } catch (error) {
       console.error("Failed to fetch templates", error);
@@ -243,65 +240,15 @@ export default function TemplatesPage() {
         }
       }
 
-      // Parse Carousel Cards
-      let carouselCards: any[] = [];
-      if (carouselComp && carouselComp.cards) {
-        carouselCards = carouselComp.cards.map((card: any, index: number) => {
-          const cardHeader = card.components.find(
-            (c: any) => c.type === "HEADER",
-          );
-          const cardBody = card.components.find((c: any) => c.type === "BODY");
-          const cardButtons = card.components.find(
-            (c: any) => c.type === "BUTTONS",
-          );
-
-          // Extract media
-          let cardS3Url = null;
-          let mimeType = null;
-          if (
-            cardHeader &&
-            cardHeader.format === "IMAGE" &&
-            cardHeader.example
-          ) {
-            const urls =
-              cardHeader.example.header_handle || cardHeader.example.header_url;
-            if (Array.isArray(urls) && urls.length > 0) cardS3Url = urls[0];
-            mimeType = "image/jpeg";
-          } else if (
-            cardHeader &&
-            cardHeader.format === "VIDEO" &&
-            cardHeader.example
-          ) {
-            const urls =
-              cardHeader.example.header_handle || cardHeader.example.header_url;
-            if (Array.isArray(urls) && urls.length > 0) cardS3Url = urls[0];
-            mimeType = "video/mp4";
-          }
-
-          return {
-            title: "",
-            subtitle: cardBody?.text || "",
-            position: index,
-            s3Url: cardS3Url,
-            mimeType: mimeType,
-            buttonText: cardButtons?.buttons?.[0]?.text,
-            buttonType: cardButtons?.buttons?.[0]?.type,
-            buttonValue:
-              cardButtons?.buttons?.[0]?.url ||
-              cardButtons?.buttons?.[0]?.phone_number,
-          };
-        });
-      }
-
       const media = headerMediaUrl
         ? [
-          {
-            id: `meta-media-${metaTpl.id}`,
-            mediaType: headerType.toLowerCase(),
-            s3Url: headerMediaUrl,
-            language: metaTpl.language,
-          },
-        ]
+            {
+              id: `meta-media-${metaTpl.id}`,
+              mediaType: headerType.toLowerCase(),
+              s3Url: headerMediaUrl,
+              language: metaTpl.language,
+            },
+          ]
         : [];
 
       return {
@@ -311,13 +258,16 @@ export default function TemplatesPage() {
         metaTemplateName: metaTpl.name,
         category: metaTpl.category,
         status: metaTpl.status.toLowerCase(),
-        languages: [{
-          language: metaTpl.language,
-          body: bodyComp.text,
-          headerType: headerType,
-          headerText: headerType === "TEXT" ? headerComp?.text : null,
-          footerText: components.find((c: any) => c.type === "FOOTER")?.text || null
-        }],
+        languages: [
+          {
+            language: metaTpl.language,
+            body: bodyComp.text,
+            headerType: headerType,
+            headerText: headerType === "TEXT" ? headerComp?.text : null,
+            footerText:
+              components.find((c: any) => c.type === "FOOTER")?.text || null,
+          },
+        ],
         buttons: buttons,
         media: media,
         createdAt: new Date().toISOString(),
@@ -332,6 +282,33 @@ export default function TemplatesPage() {
   useEffect(() => {
     fetchTemplates();
   }, []);
+
+  // Handle URL parameters for create/edit/send from Flows page
+  useEffect(() => {
+    if (loading) return; // Wait for templates to load
+
+    const createParam = searchParams.get("create");
+    const editParam = searchParams.get("edit");
+    const sendParam = searchParams.get("send");
+
+    if (createParam === "true") {
+      openCreateModal();
+      // Clear the URL params
+      router.replace("/admin/templates");
+    } else if (editParam) {
+      const template = templates.find((t) => t.id === editParam);
+      if (template) {
+        openEditModal(template);
+      }
+      router.replace("/admin/templates");
+    } else if (sendParam) {
+      const template = templates.find((t) => t.id === sendParam);
+      if (template) {
+        openSendModal(template);
+      }
+      router.replace("/admin/templates");
+    }
+  }, [searchParams, templates, loading]);
 
   // --- Create/Edit Handlers ---
 
@@ -385,10 +362,7 @@ export default function TemplatesPage() {
           type: b.type,
           text: b.text,
           value: b.value || "",
-          flowId: b.flowId,
-          flowAction: b.flowAction,
-          navigateScreen: b.navigateScreen || b.value || "" // Include navigateScreen
-        }))
+        })),
       );
     } else {
       setButtons([]);
@@ -421,7 +395,7 @@ export default function TemplatesPage() {
     setFormData({ ...formData, body: formData.body + ` {{${varCount}}} ` });
   };
 
-  const addButton = (type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "FLOW") => {
+  const addButton = (type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER") => {
     if (buttons.length >= 3) return toast.info("Max 3 buttons allowed");
     setButtons([...buttons, { type, text: "", value: "" }]);
   };
@@ -435,12 +409,6 @@ export default function TemplatesPage() {
   const updateButton = (index: number, key: string, val: string) => {
     const newButtons = [...buttons];
     (newButtons[index] as any)[key] = val;
-
-    // For Flow buttons, keep navigateScreen in sync with value
-    if ((newButtons[index] as any).type === "FLOW" && key === "value") {
-      (newButtons[index] as any).navigateScreen = val;
-    }
-
     setButtons(newButtons);
   };
 
@@ -496,17 +464,6 @@ export default function TemplatesPage() {
         data.append(`buttons[${index}][text]`, btn.text);
         if (btn.value) {
           data.append(`buttons[${index}][value]`, btn.value);
-        }
-        if (btn.type === "FLOW") {
-          if (btn.flowId) data.append(`buttons[${index}][flowId]`, btn.flowId);
-          // Ensure flowAction is sent, default to navigate
-          const action = btn.flowAction || "navigate";
-          data.append(`buttons[${index}][flowAction]`, action);
-
-          // Also explicitly send navigateScreen if inferred from value 
-          if (btn.value) {
-            data.append(`buttons[${index}][navigateScreen]`, btn.value);
-          }
         }
       });
 
@@ -810,7 +767,7 @@ export default function TemplatesPage() {
         buttons: metaTpl.buttons,
         metaId: metaTpl.id,
         status: metaTpl.status,
-        headerMediaUrl: headerMediaUrl
+        headerMediaUrl: headerMediaUrl,
       });
 
       const newTemplate = res.data;
@@ -818,7 +775,8 @@ export default function TemplatesPage() {
       // Merge media from the parsed Meta template
       const templateWithMedia = {
         ...newTemplate,
-        media: newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media
+        media:
+          newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media,
       };
 
       // Update local list with the new template
@@ -1500,127 +1458,68 @@ export default function TemplatesPage() {
                       <Eye className="w-3.5 h-3.5" />
                       Preview
                     </label>
-                    {selectedTemplate.templateType === "carousel" &&
-                      selectedTemplate.carouselCards &&
-                      selectedTemplate.carouselCards.length > 0 ? (
-                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x px-1">
-                        {selectedTemplate.carouselCards.map(
-                          (card: any, idx: number) => (
-                            <div
-                              key={idx}
-                              className="min-w-[200px] max-w-[220px] bg-white dark:bg-card rounded-lg shadow-sm border border-border/20 overflow-hidden flex-shrink-0 snap-center"
-                            >
-                              {/* Card Media */}
-                              <div className="h-[120px] bg-black/10 relative flex items-center justify-center overflow-hidden">
-                                {card.s3Url ? (
-                                  card.mimeType?.includes("video") ? (
-                                    <div className="relative w-full h-full">
-                                      <video
-                                        src={card.s3Url}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                        <Video className="w-6 h-6 text-white" />
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <img
-                                      src={card.s3Url}
-                                      alt="Card"
-                                      className="w-full h-full object-cover"
-                                    />
-                                  )
-                                ) : (
-                                  <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
-                                )}
-                              </div>
-
-                              {/* Card Body */}
-                              <div className="p-3">
-                                {card.title && (
-                                  <p className="font-bold text-xs mb-1">
-                                    {card.title}
-                                  </p>
-                                )}
-                                <p className="text-xs text-muted-foreground line-clamp-3">
-                                  {card.subtitle || card.body}
-                                </p>
-                              </div>
-
-                              {/* Card Buttons */}
-                              {(card.buttonText ||
-                                (card.buttons && card.buttons.length > 0)) && (
-                                  <div className="px-3 pb-3 pt-0">
-                                    <div className="w-full py-1.5 rounded bg-primary/5 text-primary text-[10px] font-medium text-center border border-primary/10">
-                                      {card.buttonText ||
-                                        card.buttons?.[0]?.text ||
-                                        "View"}
+                    <div className="bg-white dark:bg-card p-4 rounded-lg shadow-sm border border-border/20 text-sm whitespace-pre-wrap leading-relaxed">
+                      {/* Media Header Preview */}
+                      {selectedTemplate.languages[0]?.headerType !== "TEXT" &&
+                        (() => {
+                          const mediaItem = selectedTemplate.media?.find(
+                            (m) =>
+                              m.language ===
+                              selectedTemplate.languages[0]?.language,
+                          );
+                          if (mediaItem?.s3Url) {
+                            if (
+                              selectedTemplate.languages[0].headerType ===
+                              "IMAGE"
+                            ) {
+                              return (
+                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 shadow-md flex items-center justify-center min-h-[140px]">
+                                  <img
+                                    src={mediaItem.s3Url}
+                                    alt="Header"
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
+                              );
+                            } else if (
+                              selectedTemplate.languages[0].headerType ===
+                              "VIDEO"
+                            ) {
+                              return (
+                                <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 relative shadow-md flex items-center justify-center min-h-[140px]">
+                                  <video
+                                    src={mediaItem.s3Url}
+                                    className="w-full h-full object-contain"
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                    <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white">
+                                      <Video className="w-5 h-5" />
                                     </div>
                                   </div>
-                                )}
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    ) : (
-                      <div className="bg-white dark:bg-card p-4 rounded-lg shadow-sm border border-border/20 text-sm whitespace-pre-wrap leading-relaxed">
-                        {/* Media Header Preview */}
-                        {selectedTemplate.languages[0]?.headerType !== "TEXT" &&
-                          (() => {
-                            const mediaItem = selectedTemplate.media?.find(
-                              (m) =>
-                                m.language ===
-                                selectedTemplate.languages[0]?.language,
-                            );
-                            if (mediaItem?.s3Url) {
-                              if (
-                                selectedTemplate.languages[0].headerType ===
-                                "IMAGE"
-                              ) {
-                                return (
-                                  <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 shadow-md flex items-center justify-center min-h-[140px]">
-                                    <img
-                                      src={mediaItem.s3Url}
-                                      alt="Header"
-                                      className="w-full h-full object-contain"
-                                    />
-                                  </div>
-                                );
-                              } else if (
-                                selectedTemplate.languages[0].headerType ===
-                                "VIDEO"
-                              ) {
-                                return (
-                                  <div className="rounded-lg overflow-hidden bg-black/40 border border-border/10 mb-3 relative shadow-md flex items-center justify-center min-h-[140px]">
-                                    <video
-                                      src={mediaItem.s3Url}
-                                      className="w-full h-full object-contain"
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                                      <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white">
-                                        <Video className="w-5 h-5" />
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              }
+                                </div>
+                              );
                             }
-                            return null;
-                          })()}
+                          }
+                          return null;
+                        })()}
 
                       {/* Header Text Preview */}
-                      {selectedTemplate.languages[0]?.headerType === "TEXT" && selectedTemplate.languages[0]?.headerText && (
-                        <p className="font-bold text-sm mb-2 text-foreground">
-                          {selectedTemplate.languages[0].headerText}
-                        </p>
-                      )}
+                      {selectedTemplate.languages[0]?.headerType === "TEXT" &&
+                        selectedTemplate.languages[0]?.headerText && (
+                          <p className="font-bold text-sm mb-2 text-foreground">
+                            {selectedTemplate.languages[0].headerText}
+                          </p>
+                        )}
 
                       <div className="text-foreground/90">
                         {(() => {
                           let body = selectedTemplate.languages[0]?.body || "";
                           variables.forEach((val, idx) => {
-                            const placeholder = "{{" + (idx + 1) + "}}";
-                            body = body.replace(placeholder, val || placeholder);
+                            const placeholder = `{{${idx + 1}}}`;
+                            body = body.replace(
+                              placeholder,
+                              val || placeholder,
+                            );
                           });
                           return body;
                         })()}
@@ -1633,25 +1532,26 @@ export default function TemplatesPage() {
                       )}
 
                       {/* Buttons */}
-                      {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-border/40 space-y-2">
-                          {selectedTemplate.buttons.map((btn, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer text-primary font-medium text-sm"
-                            >
-                              {btn.type === "URL" ? (
-                                <Globe className="w-4 h-4" />
-                              ) : btn.type === "PHONE_NUMBER" ? (
-                                <Phone className="w-4 h-4" />
-                              ) : (
-                                <Send className="w-4 h-4" />
-                              )}
-                              {btn.text}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {selectedTemplate.buttons &&
+                        selectedTemplate.buttons.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-border/40 space-y-2">
+                            {selectedTemplate.buttons.map((btn, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer text-primary font-medium text-sm"
+                              >
+                                {btn.type === "URL" ? (
+                                  <Globe className="w-4 h-4" />
+                                ) : btn.type === "PHONE_NUMBER" ? (
+                                  <Phone className="w-4 h-4" />
+                                ) : (
+                                  <Send className="w-4 h-4" />
+                                )}
+                                {btn.text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                     </div>
                     )
                   }
@@ -2366,14 +2266,6 @@ export default function TemplatesPage() {
                           >
                             + Phone
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[10px]"
-                            onClick={() => addButton("FLOW")}
-                          >
-                            + Flow
-                          </Button>
                         </div>
                       </div>
 
@@ -2400,9 +2292,7 @@ export default function TemplatesPage() {
                                   {btn.type === "PHONE_NUMBER" && (
                                     <Phone className="w-3 h-3" />
                                   )}
-                                  {btn.type === "FLOW" && (
-                                    <Workflow className="w-3 h-3" />
-                                  )}
+
                                   {btn.type === "QUICK_REPLY" && (
                                     <CheckCircle className="w-3 h-3" />
                                   )}
@@ -2419,96 +2309,18 @@ export default function TemplatesPage() {
                               />
                               {(btn.type === "URL" ||
                                 btn.type === "PHONE_NUMBER") && (
-                                  <Input
-                                    className="h-8 text-sm"
-                                    placeholder={
-                                      btn.type === "URL"
-                                        ? "https://website.com"
-                                        : "+1234567890"
-                                    }
-                                    value={btn.value}
-                                    onChange={(e) =>
-                                      updateButton(idx, "value", e.target.value)
-                                    }
-                                  />
-                                )}
-                                  <Input
-                                    className="h-8 text-sm"
-                                    placeholder={
-                                      btn.type === "URL"
-                                        ? "https://website.com"
-                                        : "+1234567890"
-                                    }
-                                    value={btn.value}
-                                    onChange={(e) =>
-                                      updateButton(idx, "value", e.target.value)
-                                    }
-                                  />
-                                )}
-
-                              {btn.type === "FLOW" && (
-                                <div className="flex flex-col gap-2 mt-2">
-                                  <select
-                                    className="h-8 text-sm border rounded px-2 w-full bg-background"
-                                    value={btn.flowId || ""}
-                                    onChange={(e) => {
-                                      const selectedId = e.target.value;
-                                      const newButtons = [...buttons];
-
-                                      // 1. Update Flow ID
-                                      (newButtons[idx] as any).flowId = selectedId;
-
-                                      // 2. Auto-fetch logic
-                                      const flow = flows.find((f) => f.id === selectedId);
-                                      if (flow) {
-                                        (newButtons[idx] as any).flowAction = "navigate";
-
-                                        // Smart fetch: Try getting actual first screen from JSON
-                                        let startScreen = "START";
-                                        try {
-                                          if ((flow as any).flowJson) {
-                                            const json =
-                                              typeof (flow as any).flowJson ===
-                                                "string"
-                                                ? JSON.parse(
-                                                  (flow as any).flowJson,
-                                                )
-                                                : (flow as any).flowJson;
-
-                                            if (json.screens && json.screens.length > 0) {
-                                              startScreen = json.screens[0].id;
-                                              console.log(`âœ… Auto-fetched first screen from flowJson: ${startScreen}`);
-                                            }
-                                          } else if ((flow as any).preview?.first_screen) {
-                                            startScreen = (flow as any).preview.first_screen;
-                                            console.log(`âœ… Auto-fetched first screen from preview: ${startScreen}`);
-                                          }
-                                        } catch (e) {
-                                          console.warn("Could not auto-fetch screen ID", e);
-                                        }
-
-                                        console.log(`ðŸ”§ Setting Flow button screen ID to: ${startScreen}`);
-                                        (newButtons[idx] as any).value = startScreen;
-                                        (newButtons[idx] as any).navigateScreen = startScreen;
-                                      }
-
-                                      setButtons(newButtons);
-                                    }}
-                                  >
-                                    <option value="">Select Flow</option>
-                                    {flows.map((f) => (
-                                      <option key={f.id} value={f.id}>
-                                        {f.name} ({f.status})
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <Input
-                                    className="h-8 text-sm"
-                                    placeholder="Screen ID (e.g. WELCOME)"
-                                    value={btn.value}
-                                    onChange={(e) => updateButton(idx, "value", e.target.value)}
-                                  />
-                                </div>
+                                <Input
+                                  className="h-8 text-sm"
+                                  placeholder={
+                                    btn.type === "URL"
+                                      ? "https://website.com"
+                                      : "+1234567890"
+                                  }
+                                  value={btn.value}
+                                  onChange={(e) =>
+                                    updateButton(idx, "value", e.target.value)
+                                  }
+                                />
                               )}
                             </div>
                             <Button
