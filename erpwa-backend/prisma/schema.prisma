@@ -607,3 +607,16 @@ model FlowResponse {
   @@index([flowToken])
   @@index([status])
 }
+
+// ============================================================
+// SaaS Super Admin – platform-level administrator
+// Completely separate from regular Vendor Users
+// ============================================================
+model SuperAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

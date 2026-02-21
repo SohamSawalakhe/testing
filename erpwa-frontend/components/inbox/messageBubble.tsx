@@ -116,8 +116,8 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
                 <div
                   key={i}
                   className={`flex-1 rounded-full transition-all ${isFilled
-                      ? "bg-primary"
-                      : "bg-primary/30 hover:bg-primary/40"
+                    ? "bg-primary"
+                    : "bg-primary/30 hover:bg-primary/40"
                     }`}
                   style={{ height: `${height * 3}px`, minWidth: "2px" }}
                 />
@@ -250,8 +250,8 @@ export default function MessageBubble({
     <div className={`flex items-center gap-0.5 select-none ${customClass}`}>
       <span
         className={`text-[10px] lowercase leading-none ${isOverlay
-            ? "text-white drop-shadow-sm font-medium"
-            : "text-muted-foreground/60"
+          ? "text-white drop-shadow-sm font-medium"
+          : "text-muted-foreground/60"
           }`}
       >
         {formattedTime}
@@ -616,8 +616,8 @@ export default function MessageBubble({
                 <button
                   key={idx}
                   className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${msg.sender === "executive"
-                      ? "bg-wa-outbound"
-                      : "bg-wa-inbound"
+                    ? "bg-wa-outbound"
+                    : "bg-wa-inbound"
                     }`}
                   onClick={() => {
                     if (
@@ -805,7 +805,7 @@ export default function MessageBubble({
                     className="bg-background rounded-lg p-2 border border-border/50 flex flex-col gap-1"
                   >
                     <div className="relative w-full aspect-square bg-muted/20 rounded mb-1">
-                      {prod.retailerProductCode ? (
+                      {prod.productId ? (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
                           {/* Placeholder since we don't have catalog image fetcher yet */}
                           <ShoppingBag className="w-6 h-6 opacity-20" />
@@ -813,7 +813,7 @@ export default function MessageBubble({
                       ) : null}
                     </div>
                     <div className="font-medium text-xs truncate">
-                      Code: {prod.retailerProductCode}
+                      Code: {prod.productId}
                     </div>
                   </div>
                 ))}

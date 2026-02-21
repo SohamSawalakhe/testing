@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import Image from "next/image";
 import {
   X,
   Zap,
@@ -167,7 +168,11 @@ export default function CreateTemplateCampaignModal({
 
   const handleToggleRecipient = (id: number) => {
     const newSelected = new Set(selectedRecipients);
-    newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
     setSelectedRecipients(newSelected);
   };
 
@@ -224,6 +229,7 @@ export default function CreateTemplateCampaignModal({
       onSuccess?.();
       onClose();
     } catch (err) {
+      console.error("Launch campaign error:", err);
       alert("Failed to launch campaign. Please try again.");
     } finally {
       setIsLaunching(false);
@@ -255,7 +261,7 @@ export default function CreateTemplateCampaignModal({
         exit={{ opacity: 0, scale: 0.95 }}
         className="w-full max-w-6xl"
       >
-        <div className="bg-card rounded-2xl border border-border h-[75vh] max-h-[800px] flex flex-col overflow-hidden shadow-2xl">
+        <div className="bg-card rounded-2xl border border-border h-[75vh] max-h-200 flex flex-col overflow-hidden shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border bg-card/80 p-6">
             <div>
@@ -279,7 +285,7 @@ export default function CreateTemplateCampaignModal({
             <div className="flex-1 overflow-hidden flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background">
               {!selectedTemplate ? (
                 <div className="flex-1 flex flex-col min-h-0 p-6 space-y-6">
-                  <div className="space-y-4 flex-shrink-0">
+                  <div className="space-y-4 shrink-0">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <input
@@ -313,7 +319,7 @@ export default function CreateTemplateCampaignModal({
                     ) : (
                       templates
                         .filter((t) =>
-                          t.displayName
+                          (t.displayName || "")
                             .toLowerCase()
                             .includes(templateSearch.toLowerCase()),
                         )
@@ -588,8 +594,8 @@ export default function CreateTemplateCampaignModal({
                       </div>
 
                       {/* Recipients List */}
-                      <div className="min-h-[250px] border border-border rounded-2xl overflow-hidden bg-input/20 flex flex-col">
-                        <div className="max-h-[300px] overflow-y-auto divide-y divide-border custom-scrollbar">
+                      <div className="min-h-62.5 border border-border rounded-2xl overflow-hidden bg-input/20 flex flex-col">
+                        <div className="max-h-75 overflow-y-auto divide-y divide-border custom-scrollbar">
                           {loadingContacts ? (
                             <div className="p-10 text-center opacity-30">
                               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
@@ -649,7 +655,7 @@ export default function CreateTemplateCampaignModal({
             </div>
 
             {/* Right Panel: Preview & Recipients */}
-            <div className="w-full lg:w-[400px] overflow-hidden bg-muted/10 flex flex-col border-l border-border min-h-0 bg-gradient-to-b from-card to-background">
+            <div className="w-full lg:w-100 overflow-hidden bg-muted/10 flex flex-col border-l border-border min-h-0 bg-linear-to-b from-card to-background">
               <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center custom-scrollbar">
                 {/* Live Preview Section */}
                 {selectedTemplate ? (
@@ -662,7 +668,7 @@ export default function CreateTemplateCampaignModal({
                     </div>
 
                     {/* Mobile Frame Container - Elegantly elongated and responsive */}
-                    <div className="relative mx-auto w-full max-w-[280px] border-[10px] border-[#1F2937] rounded-[48px] shadow-2xl bg-[#0b141a] transition-all duration-500 overflow-hidden transform lg:scale-105">
+                    <div className="relative mx-auto w-full max-w-70 border-10 border-[#1F2937] rounded-6xl shadow-2xl bg-[#0b141a] transition-all duration-500 overflow-hidden transform lg:scale-105">
                       <div className="h-6 bg-[#0b141a] flex justify-between items-center px-6 pt-3 z-20 relative">
                         <span className="text-[10px] text-white font-semibold">
                           9:41
@@ -672,7 +678,7 @@ export default function CreateTemplateCampaignModal({
                         </div>
                       </div>
 
-                      <div className="relative bg-[#0b141a] p-3 pt-4 min-h-[540px] max-h-[550px] overflow-y-auto custom-scrollbar flex flex-col">
+                      <div className="relative bg-[#0b141a] p-3 pt-4 min-h-135 max-h-137.5 overflow-y-auto custom-scrollbar flex flex-col">
                         <div className="absolute inset-0 opacity-[0.05] bg-[url('https://camo.githubusercontent.com/857a221f7c706d8847f9723ec083b063878b2772591f463378b879a838be8194/68747470733a2f2f757365722d696d616765732e67697468756275736572636f6e74656e742e636f6d2f31353037353735392f32383731393134342d38366463306637302d373362312d346334382d393630332d3935303237396532373635382e706e67')] bg-repeat bg-[length:400px]"></div>
 
                         <div className="relative z-10 w-full flex flex-col gap-1 mt-1 animate-in fade-in zoom-in-95 duration-500">
@@ -691,23 +697,26 @@ export default function CreateTemplateCampaignModal({
                                         (card, i) => (
                                           <div
                                             key={i}
-                                            className="flex-shrink-0 w-[200px] bg-black/20 rounded-xl overflow-hidden snap-center flex flex-col border border-white/10 shadow-sm"
+                                            className="shrink-0 w-50 bg-black/20 rounded-xl overflow-hidden snap-center flex flex-col border border-white/10 shadow-sm"
                                           >
                                             {/* Card Media */}
                                             {card.s3Url ? (
-                                              <img
-                                                src={card.s3Url}
-                                                alt={card.title || "Card"}
-                                                className="w-full h-30 object-cover"
-                                              />
+                                              <div className="relative w-full h-32">
+                                                <Image
+                                                  src={card.s3Url}
+                                                  alt={card.title || "Card"}
+                                                  fill
+                                                  className="object-cover"
+                                                />
+                                              </div>
                                             ) : (
-                                              <div className="h-30 bg-white/5 flex items-center justify-center">
+                                              <div className="h-32 bg-white/5 flex items-center justify-center">
                                                 <ImageIcon className="w-8 h-8 opacity-30 text-white" />
                                               </div>
                                             )}
                                             {/* Card Content */}
                                             {(card.title || card.subtitle) && (
-                                              <div className="p-3 space-y-1 bg-[#202c33] min-h-[70px] flex flex-col justify-center">
+                                              <div className="p-3 space-y-1 bg-[#202c33] min-h-17.5 flex flex-col justify-center">
                                                 {card.title && (
                                                   <p className="font-bold text-sm text-white truncate leading-tight">
                                                     {card.title}
@@ -734,7 +743,7 @@ export default function CreateTemplateCampaignModal({
                                 );
                                 if (mediaItem?.s3Url) {
                                   return (
-                                    <div className="rounded-xl overflow-hidden bg-black/40 min-h-[140px] relative group flex items-center justify-center">
+                                  <div className="rounded-xl overflow-hidden bg-black/40 min-h-35 relative group flex items-center justify-center">
                                       {selectedTemplate.languages[0]
                                         .headerType === "VIDEO" ? (
                                         <video
@@ -743,10 +752,11 @@ export default function CreateTemplateCampaignModal({
                                           controls
                                         />
                                       ) : (
-                                        <img
+                                        <Image
                                           src={mediaItem.s3Url}
                                           alt="Header"
-                                          className="w-full h-full object-contain"
+                                          fill
+                                          className="object-contain"
                                         />
                                       )}
                                       <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-all" />
@@ -754,7 +764,7 @@ export default function CreateTemplateCampaignModal({
                                   );
                                 }
                                 return (
-                                  <div className="min-h-[140px] bg-[#2a3942] flex flex-col items-center justify-center rounded-xl text-slate-500 text-[10px] font-bold uppercase tracking-wider border border-white/5">
+                                  <div className="min-h-35 bg-[#2a3942] flex flex-col items-center justify-center rounded-xl text-slate-500 text-[10px] font-bold uppercase tracking-wider border border-white/5">
                                     <ImageIcon className="w-6 h-6 mb-2 opacity-30 text-white" />
                                     {selectedTemplate.languages[0].headerType}{" "}
                                     MEDIA

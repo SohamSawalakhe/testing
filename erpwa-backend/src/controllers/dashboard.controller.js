@@ -8,8 +8,11 @@ export const getDashboardStats = async (req, res) => {
         const vendorId = req.user.vendorId;
         const user = req.user;
 
+        // Define base filter (if vendorId exists, filter by it; otherwise show all for super admin)
+        const baseFilter = vendorId ? { vendorId } : {};
+
         // Define filter for leads based on role
-        const leadFilter = { vendorId };
+        const leadFilter = { ...baseFilter };
         if (user.role === 'sales') {
             leadFilter.salesPersonName = user.name;
         }
@@ -24,7 +27,7 @@ export const getDashboardStats = async (req, res) => {
         ] = await Promise.all([
             // Team members count
             prisma.user.count({
-                where: { vendorId },
+                where: baseFilter,
             }),
 
             // Total leads count (filtered)
@@ -34,13 +37,13 @@ export const getDashboardStats = async (req, res) => {
 
             // Templates count
             prisma.template.count({
-                where: { vendorId },
+                where: baseFilter,
             }),
 
             // Campaigns count
             prisma.campaign.count({
                 where: {
-                    vendorId,
+                    ...baseFilter,
                     ...(user.role === 'sales' ? { createdBy: user.id } : {}),
                 },
             }),
