@@ -3,8 +3,6 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/card";
-import { Badge } from "@/components/badge";
 import { Card, CardHeader, CardContent } from "@/components/card";
 import { Badge } from "@/components/badge";
 import {
@@ -382,8 +380,9 @@ export default function CategoriesPage() {
         toast.error(response.data.error || "Failed to delete category");
       }
     } catch (error) {
-      let errorData = (error as { response?: { data?: unknown } }).response
-        ?.data as
+      const rawData = (error as { response?: { data?: unknown } }).response
+        ?.data;
+      let errorData:
         | {
             requires_cascade?: boolean;
             images_count?: number;
@@ -393,12 +392,15 @@ export default function CategoriesPage() {
             error?: string;
           }
         | undefined;
-      if (typeof errorData === "string") {
+
+      if (typeof rawData === "string") {
         try {
-          errorData = JSON.parse(errorData);
+          errorData = JSON.parse(rawData);
         } catch {
-          errorData = { error: errorData };
+          errorData = { error: rawData };
         }
+      } else {
+        errorData = rawData as typeof errorData;
       }
 
       if (errorData?.requires_cascade) {
