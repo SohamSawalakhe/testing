@@ -17,6 +17,7 @@ export type User = {
   vendor?: {
     subscriptionStart: string | null;
     subscriptionEnd: string | null;
+    whatsappStatus?: string;
   } | null;
 };
 
@@ -93,6 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "/terms-n-condition",
         "/",
       ];
+
+      // ✅ Do not redirect super-admins to normal login
+      if (pathname.startsWith("/admin-super")) {
+        return;
+      }
+
       if (!publicPaths.includes(pathname)) {
         router.replace("/login");
       }

@@ -80,6 +80,19 @@ api.interceptors.response.use(
       url.includes("/auth/refresh") ||
       url.includes("/super-admin/")
     ) {
+      // ✅ Redirect super-admin to login if any sa-protected route returns 401
+      if (
+        url.includes("/super-admin/") &&
+        !url.includes("/super-admin/login") &&
+        error.response.status === 401
+      ) {
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/admin-super")
+        ) {
+          window.location.href = "/admin-login";
+        }
+      }
       return Promise.reject(error);
     }
 

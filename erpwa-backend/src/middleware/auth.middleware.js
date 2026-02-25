@@ -27,8 +27,9 @@ export async function authenticate(req, res, next) {
           select: {
             subscriptionEnd: true,
             subscriptionStart: true,
-          }
-        }
+            whatsappStatus: true,
+          },
+        },
       },
     });
 

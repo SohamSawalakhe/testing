@@ -39,7 +39,17 @@ const menuItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const isSetupIncomplete = user?.vendor?.whatsappStatus !== "connected";
+
+  const blockedPaths = [
+    "/inbox",
+    "/chatbot",
+    "/templates",
+    "/flows",
+    "/campaigns",
+    "/activity-logs",
+  ];
 
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -56,29 +66,56 @@ export function Sidebar() {
     menuItems.map((item) => {
       const Icon = item.icon;
       const isActive = pathname.startsWith(item.href);
+      const isBlocked =
+        isSetupIncomplete && blockedPaths.some((p) => item.href.startsWith(p));
 
+      // 🛡️ Wrapper div for handling the tooltip and cursor correctly when blocked
       return (
-        <div key={item.href} className="group relative">
-          <Link
-            href={item.href}
-            onClick={() => {
-              if (isMobile) setIsMobileOpen(false); // ✅ close only on user action
-            }}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-              isActive
-                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-              collapsed && "justify-center px-0",
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </Link>
+        <div
+          key={item.href}
+          className="group relative"
+          title={
+            isBlocked
+              ? "To use this feature, complete the setup first."
+              : collapsed
+                ? item.label
+                : undefined
+          }
+        >
+          {isBlocked ? (
+            <div
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-not-allowed opacity-50",
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                  : "text-sidebar-foreground",
+                collapsed && "justify-center px-0",
+              )}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </div>
+          ) : (
+            <Link
+              href={item.href}
+              onClick={() => {
+                if (isMobile) setIsMobileOpen(false); // ✅ close only on user action
+              }}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+                collapsed && "justify-center px-0",
+              )}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </Link>
+          )}
 
           {/* Tooltip when collapsed */}
-          {collapsed && (
+          {collapsed && !isBlocked && (
             <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
               <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap">
                 {item.label}
