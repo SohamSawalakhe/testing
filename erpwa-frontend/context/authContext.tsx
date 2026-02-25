@@ -14,6 +14,10 @@ export type User = {
   role: "vendor_owner" | "vendor_admin" | "sales" | "owner";
   vendorId: string | null;
   onboardingStatus?: string;
+  vendor?: {
+    subscriptionStart: string | null;
+    subscriptionEnd: string | null;
+  } | null;
 };
 
 type AuthContextType = {
