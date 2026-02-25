@@ -35,7 +35,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 /* ================= REFRESH QUEUE ================= */
@@ -71,11 +71,14 @@ api.interceptors.response.use(
 
     const url = originalRequest.url || "";
 
-    /* 🚫 NEVER refresh auth endpoints */
+    /* 🚫 NEVER refresh for these routes:
+       - auth endpoints (would cause loops)
+       - super-admin routes (use saToken cookie, not Bearer/refresh token) */
     if (
       url.includes("/auth/login") ||
       url.includes("/auth/logout") ||
-      url.includes("/auth/refresh")
+      url.includes("/auth/refresh") ||
+      url.includes("/super-admin/")
     ) {
       return Promise.reject(error);
     }
@@ -100,7 +103,7 @@ api.interceptors.response.use(
 
       try {
         const res = await refreshApi.post<{ accessToken: string }>(
-          "/auth/refresh"
+          "/auth/refresh",
         );
 
         const newToken = res.data.accessToken;
@@ -129,7 +132,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;
