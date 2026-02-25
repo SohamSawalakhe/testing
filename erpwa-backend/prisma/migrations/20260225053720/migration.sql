@@ -20,11 +20,18 @@ CREATE TABLE "Vendor" (
     "whatsappStatus" TEXT NOT NULL DEFAULT 'not_configured',
     "whatsappVerifiedAt" TIMESTAMP(3),
     "whatsappLastError" TEXT,
+    "whatsappVerificationStatus" TEXT,
+    "whatsappQualityRating" TEXT,
+    "whatsappMessagingTier" TEXT,
+    "whatsappVerifiedName" TEXT,
+    "whatsappDisplayPhoneNumber" TEXT,
     "whatsappFlowsPublicKey" TEXT,
     "whatsappFlowsPrivateKey" TEXT,
     "businessCategory" TEXT,
     "country" TEXT,
     "businessAttributes" JSONB,
+    "subscriptionStart" TIMESTAMP(3),
+    "subscriptionEnd" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Vendor_pkey" PRIMARY KEY ("id")
@@ -200,6 +207,7 @@ CREATE TABLE "Conversation" (
 CREATE TABLE "Template" (
     "id" TEXT NOT NULL,
     "vendorId" TEXT NOT NULL,
+    "whatsappPhoneNumberId" TEXT NOT NULL,
     "metaTemplateName" TEXT NOT NULL,
     "displayName" TEXT NOT NULL,
     "category" TEXT NOT NULL,
@@ -322,6 +330,7 @@ CREATE TABLE "Campaign" (
 CREATE TABLE "Message" (
     "id" TEXT NOT NULL,
     "vendorId" TEXT NOT NULL,
+    "whatsappPhoneNumberId" TEXT NOT NULL,
     "conversationId" TEXT NOT NULL,
     "campaignId" TEXT,
     "senderId" TEXT,
@@ -512,12 +521,6 @@ CREATE INDEX "RegistrationOTP_mobile_idx" ON "RegistrationOTP"("mobile");
 CREATE INDEX "RegistrationOTP_email_idx" ON "RegistrationOTP"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "VendorRegistration_userId_key" ON "VendorRegistration"("userId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "VendorRegistration_vendorId_key" ON "VendorRegistration"("vendorId");
-
--- CreateIndex
 CREATE INDEX "VendorRegistration_userId_idx" ON "VendorRegistration"("userId");
 
 -- CreateIndex
@@ -578,13 +581,16 @@ CREATE UNIQUE INDEX "Conversation_vendorId_leadId_key" ON "Conversation"("vendor
 CREATE INDEX "Template_vendorId_idx" ON "Template"("vendorId");
 
 -- CreateIndex
+CREATE INDEX "Template_whatsappPhoneNumberId_idx" ON "Template"("whatsappPhoneNumberId");
+
+-- CreateIndex
 CREATE INDEX "Template_createdBy_idx" ON "Template"("createdBy");
 
 -- CreateIndex
 CREATE INDEX "Template_flowId_idx" ON "Template"("flowId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Template_vendorId_metaTemplateName_key" ON "Template"("vendorId", "metaTemplateName");
+CREATE UNIQUE INDEX "Template_whatsappPhoneNumberId_metaTemplateName_key" ON "Template"("whatsappPhoneNumberId", "metaTemplateName");
 
 -- CreateIndex
 CREATE INDEX "TemplateCarouselCard_templateId_idx" ON "TemplateCarouselCard"("templateId");
@@ -615,6 +621,12 @@ CREATE INDEX "Campaign_type_idx" ON "Campaign"("type");
 
 -- CreateIndex
 CREATE INDEX "Campaign_createdBy_idx" ON "Campaign"("createdBy");
+
+-- CreateIndex
+CREATE INDEX "Message_vendorId_idx" ON "Message"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "Message_whatsappPhoneNumberId_idx" ON "Message"("whatsappPhoneNumberId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MessageDelivery_messageMediaId_conversationId_key" ON "MessageDelivery"("messageMediaId", "conversationId");
