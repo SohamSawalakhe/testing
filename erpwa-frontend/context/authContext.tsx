@@ -81,6 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const publicPaths = [
         "/login",
+        "/admin-login",
+        "/register",
         "/forgot-password",
         "/create-password",
         "/privacy-policy",

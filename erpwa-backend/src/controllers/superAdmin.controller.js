@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import { generateOtp, hashOtp } from '../utils/otp.js';
 import { sendMail } from '../utils/mailer.js';
 import { passwordResetOtpTemplate } from '../emails/passwordResetOtp.template.js';
+import { vendorActivatedWithPasswordTemplate } from '../emails/vendorActivatedWithPassword.template.js';
+import crypto from 'crypto';
 
 /* ============================================================
  * POST /api/super-admin/login
@@ -77,7 +79,7 @@ export async function getVendors(req, res) {
       include: {
         users: {
           where: { role: 'vendor_owner' },
-          select: { name: true, email: true },
+          select: { id: true, name: true, email: true, mobileNumber: true, createdAt: true, onboardingStatus: true },
           take: 1,
         },
         _count: { select: { users: true } },
@@ -87,8 +89,12 @@ export async function getVendors(req, res) {
     const result = vendors.map((v) => ({
       id: v.id,
       name: v.name,
+      businessCategory: v.businessCategory,
+      country: v.country,
       whatsappStatus: v.whatsappStatus,
       createdAt: v.createdAt,
+      subscriptionStart: v.subscriptionStart,
+      subscriptionEnd: v.subscriptionEnd,
       userCount: v._count.users,
       owner: v.users[0] ?? null,
     }));
@@ -96,6 +102,132 @@ export async function getVendors(req, res) {
     return res.json(result);
   } catch (err) {
     console.error('getVendors error:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/* ============================================================
+ * PUT /api/super-admin/vendors/:id/activate
+ * Activates a vendor by setting its owner's onboardingStatus to 'activated'
+ * ============================================================ */
+export async function activateVendor(req, res) {
+  try {
+    const { id } = req.params;
+
+    // Find the vendor_owner of this vendor
+    const owner = await prisma.user.findFirst({
+      where: { vendorId: id, role: 'vendor_owner' },
+    });
+
+    if (!owner) {
+      return res.status(404).json({ message: 'Vendor owner not found' });
+    }
+
+    // Generate an 8-character alphanumeric password
+    const plainPassword = crypto.randomBytes(4).toString('hex');
+    const passwordHash = await hashPassword(plainPassword);
+
+    // Set onboardingStatus to 'activated' and assign the new password
+    await prisma.user.update({
+      where: { id: owner.id },
+      data: { 
+        onboardingStatus: 'activated',
+        passwordHash,
+      },
+    });
+
+    // Start the trial period for the Vendor
+    const subscriptionStart = new Date();
+    const subscriptionEnd = new Date(subscriptionStart.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days
+
+    await prisma.vendor.update({
+      where: { id: id },
+      data: {
+        subscriptionStart,
+        subscriptionEnd,
+      },
+    });
+
+    // Send activation email with generated credentials to the vendor owner
+    if (owner.email) {
+      try {
+        await sendMail({
+          to: owner.email,
+          ...vendorActivatedWithPasswordTemplate({ 
+            name: owner.name || 'Vendor',
+            email: owner.email,
+            password: plainPassword
+          }),
+        });
+        console.log(`[EMAIL SUCCESS] Sent activation email & password to ${owner.email}`);
+      } catch (err) {
+        console.error(`[EMAIL FAILED] Failed to send activation email to ${owner.email}:`, err);
+        // We don't throw here to avoid preventing the activation itself if email fails
+      }
+    }
+
+    return res.json({ message: 'Vendor activated successfully and password sent via email.' });
+  } catch (err) {
+    console.error('activateVendor error:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+/* ============================================================
+ * GET /api/super-admin/vendors/:id/registration
+ * Returns the VendorRegistration snapshot for a vendor
+ * ============================================================ */
+export async function getVendorRegistration(req, res) {
+  try {
+    const { id } = req.params;
+
+    const registration = await prisma.vendorRegistration.findFirst({
+      where: { vendorId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Fallback: look up via userId (in case step2 wasn't completed yet)
+    if (!registration) {
+      const owner = await prisma.user.findFirst({
+        where: { vendorId: id, role: 'vendor_owner' },
+        select: { id: true },
+      });
+      if (owner) {
+        const regByUser = await prisma.vendorRegistration.findFirst({
+          where: { userId: owner.id },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (regByUser) return res.json(regByUser);
+      }
+      // If truly nothing stored (old vendor before this feature), return data from User/Vendor tables
+      const vendor = await prisma.vendor.findUnique({
+        where: { id },
+        include: {
+          users: {
+            where: { role: 'vendor_owner' },
+            select: { name: true, email: true, mobileNumber: true, createdAt: true, onboardingStatus: true },
+            take: 1,
+          },
+        },
+      });
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      const o = vendor.users[0];
+      return res.json({
+        ownerName: o?.name ?? null,
+        ownerEmail: o?.email ?? null,
+        ownerMobile: o?.mobileNumber ?? null,
+        businessName: vendor.name,
+        businessCategory: vendor.businessCategory,
+        country: vendor.country,
+        step1CompletedAt: o?.createdAt ?? null,
+        step2CompletedAt: null,
+        _fallback: true,
+      });
+    }
+
+    return res.json(registration);
+  } catch (err) {
+    console.error('getVendorRegistration error:', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }

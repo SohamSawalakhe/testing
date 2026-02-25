@@ -4,6 +4,8 @@ import {
   superAdminLogout,
   superAdminMe,
   getVendors,
+  activateVendor,
+  getVendorRegistration,
   getStats,
   requestChangePasswordOtp,
   verifyChangePasswordOtp,
@@ -20,8 +22,10 @@ router.post('/logout', superAdminLogout);
 
 /* ---- Protected (require saToken cookie) ---- */
 router.get('/me',      superAdminAuth, superAdminMe);
-router.get('/vendors', superAdminAuth, getVendors);
-router.get('/stats',   superAdminAuth, getStats);
+router.get('/vendors',                       superAdminAuth, getVendors);
+router.get('/vendors/:id/registration',      superAdminAuth, getVendorRegistration);
+router.put('/vendors/:id/activate',          superAdminAuth, activateVendor);
+router.get('/stats',                         superAdminAuth, getStats);
 
 /* ---- Profile ---- */
 router.put('/profile', superAdminAuth, updateSuperAdminProfile);

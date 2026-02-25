@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  Store,
   Settings,
   LogOut,
   ChevronRight,
   Menu,
   X,
+  Clock,
+  ShieldCheck,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
@@ -18,9 +19,18 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
 
-const menuItems = [
+type NavItem = {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  badge?: number;
+};
+
+const topMenuItems: NavItem[] = [
   { href: "/admin-super/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/admin-super/vendors", icon: Store, label: "Vendors" },
+];
+
+const bottomMenuItems: NavItem[] = [
   { href: "/admin-super/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -31,12 +41,32 @@ export function SidebarSuperAdmin() {
 
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [requestedCount, setRequestedCount] = useState(0);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Fetch pending vendor count for badge
+  useEffect(() => {
+    api
+      .get("/super-admin/vendors")
+      .then((r) => {
+        const count = r.data.filter(
+          (v: {
+            whatsappStatus: string;
+            owner?: { onboardingStatus: string } | null;
+          }) =>
+            v.owner !== null &&
+            v.owner?.onboardingStatus !== "activated" &&
+            v.whatsappStatus !== "connected",
+        ).length;
+        setRequestedCount(count);
+      })
+      .catch(() => {});
   }, []);
 
   const handleLogout = async () => {
@@ -48,39 +78,85 @@ export function SidebarSuperAdmin() {
     }
   };
 
-  const renderItems = (collapsed = false) =>
-    menuItems.map(({ href, icon: Icon, label }) => {
-      const isActive = pathname.startsWith(href);
-      return (
-        <div key={href} className="group relative">
-          <Link
-            href={href}
-            onClick={() => {
-              if (isMobile) setIsMobileOpen(false);
-            }}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-              isActive
-                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-              collapsed && "justify-center px-0",
-            )}
-            title={collapsed ? label : undefined}
-          >
-            <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span className="truncate">{label}</span>}
-          </Link>
-
-          {collapsed && (
-            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-              <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap">
-                {label}
-              </div>
-            </div>
+  const renderItem = (
+    { href, icon: Icon, label, badge }: NavItem,
+    collapsed = false,
+  ) => {
+    const isActive = pathname === href || pathname.startsWith(href + "/");
+    return (
+      <div key={href} className="group relative">
+        <Link
+          href={href}
+          onClick={() => {
+            if (isMobile) setIsMobileOpen(false);
+          }}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+            isActive
+              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+            collapsed && "justify-center px-0",
           )}
-        </div>
-      );
-    });
+          title={collapsed ? label : undefined}
+        >
+          <Icon className="w-5 h-5 shrink-0" />
+          {!collapsed && <span className="truncate flex-1">{label}</span>}
+          {/* Badge */}
+          {!collapsed && badge !== undefined && badge > 0 && (
+            <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full bg-amber-500 text-white">
+              {badge}
+            </span>
+          )}
+          {/* Badge (collapsed — dot) */}
+          {collapsed && badge !== undefined && badge > 0 && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
+          )}
+        </Link>
+
+        {collapsed && (
+          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap flex items-center gap-1.5">
+              {label}
+              {badge !== undefined && badge > 0 && (
+                <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 text-[10px] font-bold rounded-full bg-amber-500 text-white">
+                  {badge}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const vendorGroup = (collapsed = false) => (
+    <div className="space-y-0.5">
+      {/* Group label */}
+      {!collapsed && (
+        <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+          Vendors
+        </p>
+      )}
+      {collapsed && <div className="border-t border-sidebar-border/50 my-1" />}
+      {renderItem(
+        {
+          href: "/admin-super/vendors/requested",
+          icon: Clock,
+          label: "Requested",
+          badge: requestedCount,
+        },
+        collapsed,
+      )}
+      {renderItem(
+        {
+          href: "/admin-super/vendors/activated",
+          icon: ShieldCheck,
+          label: "Activated",
+        },
+        collapsed,
+      )}
+    </div>
+  );
 
   const logoutBtn = (collapsed = false) => (
     <button
@@ -123,9 +199,11 @@ export function SidebarSuperAdmin() {
             <Logo className="h-12 w-full max-w-[220px]" />
           </div>
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-            {renderItems(false)}
+            {topMenuItems.map((item) => renderItem(item, false))}
+            {vendorGroup(false)}
           </nav>
           <div className="border-t border-sidebar-border p-3">
+            {bottomMenuItems.map((item) => renderItem(item, false))}
             {logoutBtn(false)}
           </div>
         </aside>
@@ -178,10 +256,12 @@ export function SidebarSuperAdmin() {
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {renderItems(isCollapsed)}
+        {topMenuItems.map((item) => renderItem(item, isCollapsed))}
+        {vendorGroup(isCollapsed)}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-sidebar-border p-3 space-y-1">
+        {bottomMenuItems.map((item) => renderItem(item, isCollapsed))}
         {logoutBtn(isCollapsed)}
       </div>
     </aside>

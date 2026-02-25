@@ -22,6 +22,9 @@ CREATE TABLE "Vendor" (
     "whatsappLastError" TEXT,
     "whatsappFlowsPublicKey" TEXT,
     "whatsappFlowsPrivateKey" TEXT,
+    "businessCategory" TEXT,
+    "country" TEXT,
+    "businessAttributes" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Vendor_pkey" PRIMARY KEY ("id")
@@ -32,10 +35,12 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "vendorId" TEXT,
     "name" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "passwordHash" TEXT NOT NULL,
+    "mobileNumber" TEXT,
+    "email" TEXT,
+    "passwordHash" TEXT,
     "role" "UserRole" NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'active',
+    "onboardingStatus" TEXT NOT NULL DEFAULT 'pending',
     "isOnline" BOOLEAN NOT NULL DEFAULT false,
     "lastLoginAt" TIMESTAMP(3),
     "activatedAt" TIMESTAMP(3),
@@ -66,6 +71,39 @@ CREATE TABLE "PasswordResetOtp" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PasswordResetOtp_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RegistrationOTP" (
+    "id" TEXT NOT NULL,
+    "mobile" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "mobileOtpHash" TEXT NOT NULL,
+    "emailOtpHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RegistrationOTP_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VendorRegistration" (
+    "id" TEXT NOT NULL,
+    "ownerName" TEXT NOT NULL,
+    "ownerEmail" TEXT NOT NULL,
+    "ownerMobile" TEXT NOT NULL,
+    "businessName" TEXT,
+    "businessCategory" TEXT,
+    "country" TEXT,
+    "userId" TEXT NOT NULL,
+    "vendorId" TEXT,
+    "step1CompletedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "step2CompletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VendorRegistration_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -374,6 +412,8 @@ CREATE TABLE "ActivityLog" (
     "direction" TEXT,
     "responseCode" INTEGER,
     "processingMs" INTEGER,
+    "whatsappBusinessId" TEXT,
+    "whatsappPhoneNumberId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ActivityLog_pkey" PRIMARY KEY ("id")
@@ -441,6 +481,21 @@ CREATE TABLE "FlowResponse" (
     CONSTRAINT "FlowResponse_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "SuperAdmin" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "passwordHash" TEXT NOT NULL,
+    "name" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SuperAdmin_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_mobileNumber_key" ON "User"("mobileNumber");
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -449,6 +504,24 @@ CREATE UNIQUE INDEX "RefreshToken_tokenHash_key" ON "RefreshToken"("tokenHash");
 
 -- CreateIndex
 CREATE INDEX "PasswordResetOtp_userId_idx" ON "PasswordResetOtp"("userId");
+
+-- CreateIndex
+CREATE INDEX "RegistrationOTP_mobile_idx" ON "RegistrationOTP"("mobile");
+
+-- CreateIndex
+CREATE INDEX "RegistrationOTP_email_idx" ON "RegistrationOTP"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorRegistration_userId_key" ON "VendorRegistration"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorRegistration_vendorId_key" ON "VendorRegistration"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "VendorRegistration_userId_idx" ON "VendorRegistration"("userId");
+
+-- CreateIndex
+CREATE INDEX "VendorRegistration_vendorId_idx" ON "VendorRegistration"("vendorId");
 
 -- CreateIndex
 CREATE INDEX "Lead_email_idx" ON "Lead"("email");
@@ -565,6 +638,12 @@ CREATE INDEX "ActivityLog_createdAt_idx" ON "ActivityLog"("createdAt");
 CREATE INDEX "ActivityLog_type_idx" ON "ActivityLog"("type");
 
 -- CreateIndex
+CREATE INDEX "ActivityLog_whatsappBusinessId_idx" ON "ActivityLog"("whatsappBusinessId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_whatsappPhoneNumberId_idx" ON "ActivityLog"("whatsappPhoneNumberId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Workflow_vendorId_triggerKeyword_key" ON "Workflow"("vendorId", "triggerKeyword");
 
 -- CreateIndex
@@ -591,6 +670,9 @@ CREATE INDEX "FlowResponse_flowToken_idx" ON "FlowResponse"("flowToken");
 -- CreateIndex
 CREATE INDEX "FlowResponse_status_idx" ON "FlowResponse"("status");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "SuperAdmin_email_key" ON "SuperAdmin"("email");
+
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -599,6 +681,12 @@ ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "PasswordResetOtp" ADD CONSTRAINT "PasswordResetOtp_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorRegistration" ADD CONSTRAINT "VendorRegistration_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorRegistration" ADD CONSTRAINT "VendorRegistration_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Lead" ADD CONSTRAINT "Lead_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
