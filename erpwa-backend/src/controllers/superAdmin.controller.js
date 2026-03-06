@@ -391,14 +391,14 @@ export async function verifyChangePasswordOtp(req, res) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
-    // Issue a resetToken (15 min)
+    // Issue a resetToken (5 min)
     const resetToken = jwt.sign(
       { sub: payload.sub, purpose: "sa_reset_password" },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "15m" },
+      { expiresIn: "5m" },
     );
 
-    return res.json({ message: "OTP verified", resetToken });
+    return res.json({ message: "OTP verified", resetToken, expires_in: 300 });
   } catch (err) {
     console.error("verifyChangePasswordOtp error:", err);
     return res.status(500).json({ message: "Internal server error" });
