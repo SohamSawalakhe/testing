@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
+import api, { setAccessToken } from "@/lib/api";
 import { ShieldCheck, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -11,13 +11,27 @@ export default function SuperAdminLoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        await api.get("/super-admin/me");
+        router.push("/admin-super/dashboard");
+      } catch (err) {
+        setInitialLoading(false);
+      }
+    };
+    checkSession();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post("/super-admin/login", { email, password });
+      const res = await api.post("/super-admin/login", { email, password });
+      setAccessToken(res.data.accessToken);
       toast.success("Welcome back, Super Admin!");
       router.push("/admin-super/dashboard");
     } catch (err: any) {
@@ -26,6 +40,14 @@ export default function SuperAdminLoginPage() {
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">

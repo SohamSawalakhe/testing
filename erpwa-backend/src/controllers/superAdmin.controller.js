@@ -5,6 +5,16 @@ import { generateOtp, hashOtp } from "../utils/otp.js";
 import { sendMail } from "../utils/mailer.js";
 import { passwordResetOtpTemplate } from "../emails/passwordResetOtp.template.js";
 import crypto from "crypto";
+import { generateAccessToken, generateRefreshToken } from "../utils/token.js";
+import { hashToken } from "../utils/hash.js";
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
 
 /* ============================================================
  * POST /api/super-admin/login
@@ -30,28 +40,27 @@ export async function superAdminLogin(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Generate a dedicated Super Admin JWT stored in a httpOnly cookie
-    const token = jwt.sign(
-      {
-        sub: admin.id,
-        email: admin.email,
-        name: admin.name,
-        role: "super_admin",
-      },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "8h" },
-    );
+    admin.role = "super_admin"; // For token generation
+    const accessToken = generateAccessToken(admin);
+    const refreshToken = generateRefreshToken();
 
-    res.cookie("saToken", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 8 * 60 * 60 * 1000, // 8 hours
-    });
+    await prisma.$transaction([
+      prisma.superAdminRefreshToken.deleteMany({ where: { adminId: admin.id } }),
+      prisma.superAdminRefreshToken.create({
+        data: {
+          adminId: admin.id,
+          tokenHash: hashToken(refreshToken),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      }),
+    ]);
+
+    res.cookie("saRefreshToken", refreshToken, COOKIE_OPTIONS);
 
     return res.json({
       message: "Login successful",
-      admin: { id: admin.id, email: admin.email, name: admin.name },
+      accessToken,
+      admin: { id: admin.id, email: admin.email, name: admin.name, role: "super_admin" },
     });
   } catch (err) {
     console.error("superAdminLogin error:", err);
@@ -60,11 +69,59 @@ export async function superAdminLogin(req, res) {
 }
 
 /* ============================================================
+ * POST /api/super-admin/refresh
+ * ============================================================ */
+export async function superAdminRefresh(req, res) {
+  const token = req.cookies?.saRefreshToken;
+
+  if (!token) {
+    console.log("❌ S-A REFRESH: No token in cookies");
+    res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+    return res.status(401).json({ message: "No token" });
+  }
+
+  try {
+    const tokenHash = hashToken(token);
+
+    const record = await prisma.superAdminRefreshToken.findUnique({
+      where: { tokenHash },
+      include: { admin: true },
+    });
+
+    if (!record) {
+      await prisma.superAdminRefreshToken.deleteMany({ where: { tokenHash } });
+      res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    if (record.expiresAt < new Date()) {
+      await prisma.superAdminRefreshToken.delete({ where: { tokenHash } });
+      res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: "Expired refresh token" });
+    }
+
+    record.admin.role = "super_admin";
+    const accessToken = generateAccessToken(record.admin);
+    return res.json({ accessToken });
+  } catch (err) {
+    console.error("❌ S-A REFRESH ERROR:", err.message);
+    res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+    return res.status(401).json({ message: "Invalid refresh token" });
+  }
+}
+
+/* ============================================================
  * POST /api/super-admin/logout
  * ============================================================ */
-export function superAdminLogout(req, res) {
-  res.clearCookie("saToken");
-  return res.json({ message: "Logged out" });
+export async function superAdminLogout(req, res) {
+  if (req.cookies?.saRefreshToken) {
+    const tokenHash = hashToken(req.cookies.saRefreshToken);
+    await prisma.superAdminRefreshToken.deleteMany({
+      where: { tokenHash },
+    });
+  }
+  res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+  return res.json({ message: "Logged out", success: true });
 }
 
 /* ============================================================
@@ -149,6 +206,11 @@ export async function activateVendor(req, res) {
       },
     });
 
+    // Find the default "Free" plan
+    const freePlan = await prisma.subscriptionPlan.findUnique({
+      where: { name: "Free" }
+    });
+
     // Start the trial period for the Vendor
     const subscriptionStart = new Date();
     const subscriptionEnd = new Date(
@@ -160,6 +222,7 @@ export async function activateVendor(req, res) {
       data: {
         subscriptionStart,
         subscriptionEnd,
+        subscriptionPlanId: freePlan ? freePlan.id : undefined,
       },
     });
 
@@ -489,6 +552,143 @@ export async function updateSuperAdminProfile(req, res) {
     return res.json({ message: "Profile updated", admin: updated });
   } catch (err) {
     console.error("updateSuperAdminProfile error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * GET /api/super-admin/subscription-plans
+ * Returns all subscription plans
+ * ============================================================ */
+export async function getSubscriptionPlans(req, res) {
+  try {
+    const plans = await prisma.subscriptionPlan.findMany({
+      orderBy: { price: "asc" },
+    });
+    return res.json(plans);
+  } catch (err) {
+    console.error("getSubscriptionPlans error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * POST /api/super-admin/subscription-plans
+ * Creates a new subscription plan
+ * ============================================================ */
+export async function createSubscriptionPlan(req, res) {
+  try {
+    const { name, price, currency, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
+
+    if (!name) return res.status(400).json({ message: "Plan name is required" });
+
+    const existing = await prisma.subscriptionPlan.findUnique({ where: { name } });
+    if (existing) return res.status(400).json({ message: "A plan with this name already exists" });
+
+    const newPlan = await prisma.subscriptionPlan.create({
+      data: {
+        name,
+        price: price || 0,
+        currency: currency || "USD",
+        conversationLimit: conversationLimit ?? 100,
+        galleryLimit: galleryLimit ?? 50,
+        chatbotLimit: chatbotLimit ?? 1,
+        templateLimit: templateLimit ?? 5,
+        formLimit: formLimit ?? 2,
+        teamUsersLimit: teamUsersLimit ?? 1,
+      },
+    });
+
+    return res.status(201).json({ message: "Subscription plan created", plan: newPlan });
+  } catch (err) {
+    console.error("createSubscriptionPlan error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * PUT /api/super-admin/subscription-plans/:id
+ * Updates an existing subscription plan
+ * ============================================================ */
+export async function updateSubscriptionPlan(req, res) {
+  try {
+    const { id } = req.params;
+    const { name, price, currency, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
+
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id } });
+    if (!plan) return res.status(404).json({ message: "Subscription plan not found" });
+
+    if (name && name !== plan.name) {
+      const existing = await prisma.subscriptionPlan.findUnique({ where: { name } });
+      if (existing) return res.status(400).json({ message: "A plan with this name already exists" });
+    }
+
+    const updatedPlan = await prisma.subscriptionPlan.update({
+      where: { id },
+      data: {
+        name: name !== undefined ? name : plan.name,
+        price: price !== undefined ? price : plan.price,
+        currency: currency !== undefined ? currency : plan.currency,
+        conversationLimit: conversationLimit !== undefined ? conversationLimit : plan.conversationLimit,
+        galleryLimit: galleryLimit !== undefined ? galleryLimit : plan.galleryLimit,
+        chatbotLimit: chatbotLimit !== undefined ? chatbotLimit : plan.chatbotLimit,
+        templateLimit: templateLimit !== undefined ? templateLimit : plan.templateLimit,
+        formLimit: formLimit !== undefined ? formLimit : plan.formLimit,
+        teamUsersLimit: teamUsersLimit !== undefined ? teamUsersLimit : plan.teamUsersLimit,
+      },
+    });
+
+    return res.json({ message: "Subscription plan updated", plan: updatedPlan });
+  } catch (err) {
+    console.error("updateSubscriptionPlan error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * DELETE /api/super-admin/subscription-plans/:id
+ * Deletes a subscription plan
+ * ============================================================ */
+export async function deleteSubscriptionPlan(req, res) {
+  try {
+    const { id } = req.params;
+
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id } });
+    if (!plan) return res.status(404).json({ message: "Subscription plan not found" });
+
+    await prisma.subscriptionPlan.delete({ where: { id } });
+
+    return res.json({ message: "Subscription plan deleted" });
+  } catch (err) {
+    console.error("deleteSubscriptionPlan error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * POST /api/super-admin/subscription-plans/init
+ * Initializes default subscription plans (Free, Basic, Premium, Unlimited)
+ * ============================================================ */
+export async function initSubscriptionPlans(req, res) {
+  try {
+    const defaultPlans = [
+      { name: "Free", price: 0, conversationLimit: 100, galleryLimit: 50, chatbotLimit: 1, templateLimit: 5, formLimit: 2, teamUsersLimit: 1 },
+      { name: "Basic", price: 29, conversationLimit: 1000, galleryLimit: 500, chatbotLimit: 3, templateLimit: 20, formLimit: 5, teamUsersLimit: 3 },
+      { name: "Premium", price: 99, conversationLimit: 5000, galleryLimit: 2048, chatbotLimit: 10, templateLimit: 100, formLimit: 20, teamUsersLimit: 10 },
+      { name: "Unlimited", price: 299, conversationLimit: -1, galleryLimit: -1, chatbotLimit: -1, templateLimit: -1, formLimit: -1, teamUsersLimit: -1 },
+    ];
+
+    for (const plan of defaultPlans) {
+      await prisma.subscriptionPlan.upsert({
+        where: { name: plan.name },
+        update: {}, // Don't override if already exists or maybe we choose to override
+        create: plan,
+      });
+    }
+
+    return res.json({ message: "Default subscription plans initialized" });
+  } catch (err) {
+    console.error("initSubscriptionPlans error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

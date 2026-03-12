@@ -282,6 +282,13 @@ router.post(
       return res.json(updated);
     }
 
+    // Downgrade to "draft" if they've exceeded their active template limit
+    const { hasTemplateLimitReached } = await import("../utils/subscription.js");
+    const isLimitReached = await hasTemplateLimitReached(req.user.vendorId);
+    const finalStatus = (isLimitReached && ["approved", "APPROVED", "pending", "PENDING", "active", "ACTIVE"].includes(status))
+      ? "draft"
+      : status;
+
     // Create template (scoped to current phone number)
     const template = await prisma.template.create({
       data: {
@@ -290,7 +297,7 @@ router.post(
         metaTemplateName,
         displayName,
         category,
-        status: status, // Trusted from Meta
+        status: finalStatus,
         createdBy: req.user.id,
       },
     });
@@ -303,7 +310,7 @@ router.post(
         headerType,
         headerText,
         footerText,
-        metaStatus: status,
+        metaStatus: finalStatus,
         metaId: metaId,
       },
     });
@@ -444,6 +451,13 @@ router.post(
     console.log("🚀 [TEMPLATE CREATE] Request received");
     console.log("📦 Request Body Keys:", Object.keys(req.body));
     console.log("📂 Request Files count:", req.files ? req.files.length : 0);
+
+    const { hasTemplateLimitReached } = await import("../utils/subscription.js");
+    if (await hasTemplateLimitReached(req.user.vendorId)) {
+      return res.status(403).json({
+        message: "Subscription limit reached. You cannot create any more templates."
+      });
+    }
 
     const {
       metaTemplateName,
@@ -1019,6 +1033,14 @@ router.post(
       return res.status(404).json({ message: "Template not found" });
     }
 
+    // 🔥 Enforce template limit before submitting to Meta
+    const { hasTemplateLimitReached } = await import("../utils/subscription.js");
+    if (await hasTemplateLimitReached(req.user.vendorId)) {
+      return res.status(403).json({
+        message: "Subscription limit reached. You cannot send more templates for approval."
+      });
+    }
+
     const language = template.languages[0];
     const headerType = (language.headerType || "TEXT").toUpperCase();
     const accessToken = decrypt(template.vendor.whatsappAccessToken);
@@ -1458,9 +1480,20 @@ router.post(
 
     console.log("📥 Meta Template Status:", metaTemplate.status);
 
-    // Update local database
-    const newStatus = metaTemplate.status.toLowerCase();
+    const newStatusRaw = metaTemplate.status.toLowerCase();
+    let newStatus = newStatusRaw;
 
+    const activeStatuses = ["approved", "pending", "active"];
+    // If transitioning to an active status, check limits
+    if (!activeStatuses.includes(template.status) && activeStatuses.includes(newStatusRaw)) {
+      const { hasTemplateLimitReached } = await import("../utils/subscription.js");
+      if (await hasTemplateLimitReached(req.user.vendorId)) {
+        newStatus = "draft";
+        console.log(`⚠️ Template limit reached for Vendor ${req.user.vendorId}. Downgrading synced status to draft.`);
+      }
+    }
+
+    // Update local database
     await prisma.template.update({
       where: { id: template.id },
       data: { status: newStatus },

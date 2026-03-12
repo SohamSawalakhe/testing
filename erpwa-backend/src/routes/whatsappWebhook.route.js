@@ -218,6 +218,7 @@ router.post("/", async (req, res) => {
             leadId: lead.id,
             channel: "whatsapp",
             isOpen: true,
+            initiatedBy: "lead", // 🔥 Important: Customer initiated
 
             // 🔥 SOURCE OF TRUTH
             sessionStartedAt: inboundAt,
@@ -319,7 +320,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch {}
+        } catch { }
 
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
@@ -350,7 +351,7 @@ router.post("/", async (req, res) => {
             mimeType: fullMessage.media[0]?.mimeType,
             caption: fullMessage.media[0]?.caption,
           });
-        } catch (socketErr) {}
+        } catch (socketErr) { }
 
         // ============================================
         // 🚀 WORKFLOW ENGINE INTEGRATION
@@ -512,7 +513,7 @@ router.post("/", async (req, res) => {
               status: waState,
             },
           );
-        } catch {}
+        } catch { }
       }
     }
 

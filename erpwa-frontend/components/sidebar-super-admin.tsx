@@ -11,6 +11,7 @@ import {
   X,
   Clock,
   ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ type NavItem = {
 
 const topMenuItems: NavItem[] = [
   { href: "/admin-super/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/admin-super/plans", icon: Zap, label: "Plans" },
 ];
 
 const bottomMenuItems: NavItem[] = [
@@ -66,7 +68,7 @@ export function SidebarSuperAdmin() {
         ).length;
         setRequestedCount(count);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleLogout = async () => {

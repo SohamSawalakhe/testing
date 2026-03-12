@@ -72,19 +72,19 @@ api.interceptors.response.use(
     const url = originalRequest.url || "";
 
     /* 🚫 NEVER refresh for these routes:
-       - auth endpoints (would cause loops)
-       - super-admin routes (use saToken cookie, not Bearer/refresh token) */
+       - auth endpoints (would cause loops) */
     if (
       url.includes("/auth/login") ||
       url.includes("/auth/logout") ||
       url.includes("/auth/refresh") ||
-      url.includes("/super-admin/")
+      url.includes("/super-admin/login") ||
+      url.includes("/super-admin/logout") ||
+      url.includes("/super-admin/refresh")
     ) {
-      // ✅ Redirect super-admin to login if any sa-protected route returns 401
+      // ✅ Redirect super-admin to login if auth loops
       if (
         url.includes("/super-admin/") &&
-        !url.includes("/super-admin/login") &&
-        error.response.status === 401
+        error.response?.status === 401
       ) {
         if (
           typeof window !== "undefined" &&
@@ -115,8 +115,11 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        const isSuperAdminRoute = url.includes("/super-admin/");
+        const refreshEndpoint = isSuperAdminRoute ? "/super-admin/refresh" : "/auth/refresh";
+
         const res = await refreshApi.post<{ accessToken: string }>(
-          "/auth/refresh",
+          refreshEndpoint,
         );
 
         const newToken = res.data.accessToken;
