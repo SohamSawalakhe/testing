@@ -245,6 +245,11 @@ export default function ManageTeam() {
                 await usersAPI.delete(id)
                 toast.success("✅ Team member removed successfully")
                 setTeam(prev => prev.filter(m => m.id !== id))
+                
+                // Refresh limits so the count goes down
+                usersAPI.getLimits().then(res => {
+                  if (res.data) setTeamLimits(res.data)
+                }).catch(err => console.error("Failed to refresh limits", err))
               } catch (error) {
                 toast.error("❌ Failed to delete user")
               }

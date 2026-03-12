@@ -179,17 +179,24 @@ export default function TemplatesPage() {
     }
   }, [showSendModal]);
 
+  const [templateLimits, setTemplateLimits] = useState<{ limit: number, currentCount: number } | null>(null);
+
   // Fetch Templates
   const fetchTemplates = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [localRes, metaRes] = await Promise.all([
+      const [localRes, metaRes, limitsRes] = await Promise.all([
         api.get("/vendor/templates"),
         api.get("/vendor/templates/meta").catch(() => ({ data: [] })),
+        api.get("/vendor/templates/limits").catch(() => ({ data: null }))
       ]);
 
       const localTemplates = localRes.data;
       const metaRaw = metaRes.data || [];
+
+      if (limitsRes.data) {
+        setTemplateLimits(limitsRes.data);
+      }
 
       // Parse Meta templates
       const parsedMeta = metaRaw
@@ -967,10 +974,22 @@ export default function TemplatesPage() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
               Message Templates
             </h1>
-            <p className="text-sm text-muted-foreground/80 max-w-lg leading-relaxed">
-              Create and manage your WhatsApp templates. Approved templates can
-              be used for bulk marketing and utility messaging.
-            </p>
+            <div className="flex items-center gap-3 mt-2">
+              <p className="text-sm text-muted-foreground/80 max-w-lg leading-relaxed">
+                Create and manage your WhatsApp templates. Approved templates can
+                be used for bulk marketing and utility messaging.
+              </p>
+              {templateLimits && templateLimits.limit !== -1 && (
+                <Badge variant={templateLimits.currentCount >= templateLimits.limit ? "destructive" : "secondary"}>
+                  {templateLimits.currentCount} / {templateLimits.limit} Plan Limit
+                </Badge>
+              )}
+              {templateLimits && templateLimits.limit === -1 && (
+                <Badge variant="secondary">
+                  Unlimited Templates
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="flex gap-3">
             <Button
