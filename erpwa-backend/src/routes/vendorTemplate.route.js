@@ -19,6 +19,39 @@ const router = express.Router();
  * ===============================
  */
 router.get(
+  "/limits",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin", "sales"]),
+  asyncHandler(async (req, res) => {
+    try {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: req.user.vendorId },
+        include: { subscriptionPlan: true },
+      });
+
+      if (!vendor || !vendor.subscriptionPlan) {
+        return res.json({ limit: -1, currentCount: 0 });
+      }
+
+      const { templateLimit } = vendor.subscriptionPlan;
+      const count = await prisma.template.count({
+        where: {
+          vendorId: req.user.vendorId,
+          status: {
+            in: ["approved", "APPROVED", "pending", "PENDING", "ACTIVE", "active"]
+          }
+        }
+      });
+
+      res.json({ limit: templateLimit, currentCount: count });
+    } catch (error) {
+      console.error("Get template limits error:", error);
+      res.status(500).json({ message: "Failed to get template limits" });
+    }
+  }),
+);
+
+router.get(
   "/",
   authenticate,
   requireRoles(["vendor_owner", "vendor_admin", "sales"]),
@@ -117,7 +150,7 @@ router.get(
     try {
       // Fetch templates from Meta API
       const metaResp = await fetch(
-        `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?limit=100`,
+        `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?fields=name,components,language,status,category,id&limit=100`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         },
