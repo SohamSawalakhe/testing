@@ -156,3 +156,57 @@ export default api;
 export function getAccessToken() {
   return accessToken;
 }
+        return new Promise((resolve, reject) => {
+          failedQueue.push({
+            resolve: (token: string) => {
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+              }
+              resolve(api(originalRequest));
+            },
+            reject,
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const isSuperAdminRoute = url.includes("/super-admin/");
+        const refreshEndpoint = isSuperAdminRoute ? "/super-admin/refresh" : "/auth/refresh";
+
+        const res = await refreshApi.post<{ accessToken: string }>(
+          refreshEndpoint,
+        );
+
+        const newToken = res.data.accessToken;
+        setAccessToken(newToken);
+
+        processQueue(null, newToken);
+
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        }
+
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError as AxiosError, null);
+        setAccessToken(null);
+
+        // 🔴 GLOBAL LOGOUT EVENT
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("auth:logout"));
+        }
+
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+
+export default api;
