@@ -105,8 +105,11 @@ export async function superAdminRefresh(req, res) {
     return res.json({ accessToken });
   } catch (err) {
     console.error("❌ S-A REFRESH ERROR:", err.message);
-    res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
-    return res.status(401).json({ message: "Invalid refresh token" });
+    if (err.message === "Invalid refresh token" || err.message === "Expired refresh token") {
+      res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: err.message });
+    }
+    return res.status(500).json({ message: "Internal server error during refresh" });
   }
 }
 

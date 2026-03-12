@@ -136,9 +136,12 @@ api.interceptors.response.use(
         processQueue(refreshError as AxiosError, null);
         setAccessToken(null);
 
-        // 🔴 GLOBAL LOGOUT EVENT (OPTION 1)
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("auth:logout"));
+        // Only log out if it's an auth error (not a 500/timeout)
+        const status = (refreshError as AxiosError).response?.status;
+        if (status === 401 || status === 403) {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("auth:logout"));
+          }
         }
 
         return Promise.reject(refreshError);

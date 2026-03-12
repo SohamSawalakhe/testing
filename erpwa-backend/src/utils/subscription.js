@@ -80,3 +80,33 @@ export async function hasTemplateLimitReached(vendorId) {
         return true;
     }
 }
+
+/**
+ * Validates if a vendor can add another team member.
+ * Throws an Error if the limit is exceeded.
+ */
+export async function enforceTeamUsersLimit(vendorId) {
+    const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        include: { subscriptionPlan: true },
+    });
+
+    if (!vendor || !vendor.subscriptionPlan) return true;
+
+    const { teamUsersLimit, name } = vendor.subscriptionPlan;
+
+    if (teamUsersLimit === -1) return true; // Unlimited
+
+    const count = await prisma.user.count({
+        where: {
+            vendorId,
+            role: { not: "vendor_owner" }
+        }
+    });
+
+    if (count >= teamUsersLimit) {
+        throw new Error(`Subscription limit reached. Your ${name} plan allows up to ${teamUsersLimit} team members.`);
+    }
+
+    return true;
+}

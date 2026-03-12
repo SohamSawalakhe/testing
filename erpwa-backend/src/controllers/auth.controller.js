@@ -49,9 +49,16 @@ export async function refresh(req, res) {
     return res.json(data);
   } catch (err) {
     console.error("❌ REFRESH ERROR:", err.message);
-    // 🔴 DELETE COOKIE ON FAILURE
-    res.clearCookie("refreshToken", COOKIE_OPTIONS);
-    return res.status(401).json({ message: "Invalid refresh token" });
+    
+    // Only delete cookie if the token is definitely invalid or expired
+    if (err.message === "Invalid refresh token" || err.message === "Expired refresh token") {
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: err.message });
+    }
+    
+    // For DB or network errors, do NOT clear the cookie, just return 500
+    // so the frontend can try again later without logging out the user.
+    return res.status(500).json({ message: "Internal server error during refresh" });
   }
 }
 
