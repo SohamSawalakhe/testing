@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import api, { setSuperAdminAccessToken } from "@/lib/api";
 import type React from "react";
 import { SidebarSuperAdmin } from "@/components/sidebar-super-admin";
 import { HeaderSuperAdmin } from "@/components/header-super-admin";
@@ -7,6 +10,24 @@ import { SidebarProvider, useSidebar } from "@/context/sidebar-provider";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
+  const router = useRouter();
+
+  useEffect(() => {
+    // 🔐 Restore SA session if on SA route
+    if (window.location.pathname.startsWith("/admin-super")) {
+      api.get("/super-admin/me").catch(() => {
+        // Interceptor handles retry/refresh
+      });
+    }
+
+    const handleSALogout = () => {
+      setSuperAdminAccessToken(null);
+      router.replace("/admin-login");
+    };
+
+    window.addEventListener("sa:auth:logout", handleSALogout);
+    return () => window.removeEventListener("sa:auth:logout", handleSALogout);
+  }, [router]);
 
   return (
     <div className="flex h-screen bg-background">
