@@ -28,11 +28,11 @@ async function main() {
     //   name: "Gaurav Rai",
     //   role: "vendor_owner",
     // },
-    // {
-    //   email: "pradhanpratik219@gmail.com",
-    //   name: "Pratik Pradhan",
-    //   role: "vendor_admin",
-    // },
+    {
+      email: "pradhanpratik219@gmail.com",
+      name: "Pratik Pradhan",
+      role: "vendor_admin",
+    },
     {
       email: "support@gpserp.com",
       name: "GPSERP Support",
