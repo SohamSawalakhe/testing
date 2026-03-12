@@ -282,12 +282,16 @@ router.post(
       return res.json(updated);
     }
 
-    // Downgrade to "draft" if they've exceeded their active template limit
+    // Block the import completely if they've exceeded their active template limit
+    // so it remains a Meta template instead of importing as "draft"
     const { hasTemplateLimitReached } = await import("../utils/subscription.js");
     const isLimitReached = await hasTemplateLimitReached(req.user.vendorId);
-    const finalStatus = (isLimitReached && ["approved", "APPROVED", "pending", "PENDING", "active", "ACTIVE"].includes(status))
-      ? "draft"
-      : status;
+    if (isLimitReached && ["approved", "APPROVED", "pending", "PENDING", "active", "ACTIVE"].includes(status)) {
+      return res.status(403).json({
+        message: "Subscription limit reached. Upgrade your plan to import this template."
+      });
+    }
+    const finalStatus = status;
 
     // Create template (scoped to current phone number)
     const template = await prisma.template.create({
@@ -1488,8 +1492,9 @@ router.post(
     if (!activeStatuses.includes(template.status) && activeStatuses.includes(newStatusRaw)) {
       const { hasTemplateLimitReached } = await import("../utils/subscription.js");
       if (await hasTemplateLimitReached(req.user.vendorId)) {
-        newStatus = "draft";
-        console.log(`⚠️ Template limit reached for Vendor ${req.user.vendorId}. Downgrading synced status to draft.`);
+        return res.status(403).json({
+          message: "Subscription limit reached. Cannot sync status to approved. Upgrade your plan to sync this template."
+        });
       }
     }
 

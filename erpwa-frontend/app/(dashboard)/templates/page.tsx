@@ -261,13 +261,13 @@ export default function TemplatesPage() {
       // Build media array for preview modal compatibility
       const media = headerMediaUrl
         ? [
-            {
-              id: `meta-media-${metaTpl.id}`,
-              mediaType: headerType.toLowerCase(),
-              s3Url: headerMediaUrl,
-              language: metaTpl.language,
-            },
-          ]
+          {
+            id: `meta-media-${metaTpl.id}`,
+            mediaType: headerType.toLowerCase(),
+            s3Url: headerMediaUrl,
+            language: metaTpl.language,
+          },
+        ]
         : [];
 
       return {
@@ -459,10 +459,10 @@ export default function TemplatesPage() {
           prev.map((t) =>
             t.id === editId
               ? {
-                  ...t,
-                  displayName: formData.displayName,
-                  category: formData.category,
-                }
+                ...t,
+                displayName: formData.displayName,
+                category: formData.category,
+              }
               : t,
           ),
         );
@@ -844,8 +844,7 @@ export default function TemplatesPage() {
           toast.error(`Failed to send: ${firstError}`);
         } else {
           toast.warning(
-            `${results.length - failed.length} sent, ${
-              failed.length
+            `${results.length - failed.length} sent, ${failed.length
             } failed. First error: ${firstError}`,
           );
         }
@@ -1661,7 +1660,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               ).length > 0 &&
                               leads
                                 .filter(
@@ -1679,7 +1678,7 @@ export default function TemplatesPage() {
                                       l.category_name === selectedCategory) &&
                                     (!selectedSubCategory ||
                                       l.sub_category_name ===
-                                        selectedSubCategory),
+                                      selectedSubCategory),
                                 )
                                 .every((l) =>
                                   recipientList.includes(l.mobile_number),
@@ -1697,7 +1696,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               );
                               const allSelected = filtered.every((l) =>
                                 recipientList.includes(l.mobile_number),
@@ -1739,7 +1738,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               ).length
                             }
                             )
@@ -1787,7 +1786,7 @@ export default function TemplatesPage() {
                                 checked={recipientList.includes(
                                   lead.mobile_number,
                                 )}
-                                onChange={() => {}} // handled by parent div click
+                                onChange={() => { }} // handled by parent div click
                                 className="pointer-events-none"
                               />
                               <div className="flex flex-col">
@@ -2257,19 +2256,19 @@ export default function TemplatesPage() {
                               />
                               {(btn.type === "URL" ||
                                 btn.type === "PHONE_NUMBER") && (
-                                <Input
-                                  className="h-8 text-sm"
-                                  placeholder={
-                                    btn.type === "URL"
-                                      ? "https://website.com"
-                                      : "+1234567890"
-                                  }
-                                  value={btn.value}
-                                  onChange={(e) =>
-                                    updateButton(idx, "value", e.target.value)
-                                  }
-                                />
-                              )}
+                                  <Input
+                                    className="h-8 text-sm"
+                                    placeholder={
+                                      btn.type === "URL"
+                                        ? "https://website.com"
+                                        : "+1234567890"
+                                    }
+                                    value={btn.value}
+                                    onChange={(e) =>
+                                      updateButton(idx, "value", e.target.value)
+                                    }
+                                  />
+                                )}
                             </div>
                             <Button
                               variant="ghost"
@@ -2328,34 +2327,34 @@ export default function TemplatesPage() {
                             {/* Header Media */}
                             {(formData.headerType === "IMAGE" ||
                               formData.headerType === "VIDEO") && (
-                              <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
-                                {headerPreview ? (
-                                  formData.headerType === "VIDEO" ? (
-                                    <video
-                                      src={headerPreview}
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    <img
-                                      src={headerPreview}
-                                      alt="Header"
-                                      className="w-full h-full object-contain"
-                                    />
-                                  )
-                                ) : (
-                                  <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
-                                    {formData.headerType === "IMAGE" ? (
-                                      <ImageIcon className="w-6 h-6" />
+                                <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
+                                  {headerPreview ? (
+                                    formData.headerType === "VIDEO" ? (
+                                      <video
+                                        src={headerPreview}
+                                        className="w-full h-full object-contain"
+                                      />
                                     ) : (
-                                      <Video className="w-6 h-6" />
-                                    )}
-                                    <span className="text-[8px] font-bold uppercase">
-                                      {formData.headerType}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                      <img
+                                        src={headerPreview}
+                                        alt="Header"
+                                        className="w-full h-full object-contain"
+                                      />
+                                    )
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
+                                      {formData.headerType === "IMAGE" ? (
+                                        <ImageIcon className="w-6 h-6" />
+                                      ) : (
+                                        <Video className="w-6 h-6" />
+                                      )}
+                                      <span className="text-[8px] font-bold uppercase">
+                                        {formData.headerType}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
 
                             {/* Header Text */}
                             {formData.headerType === "TEXT" &&
