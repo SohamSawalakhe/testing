@@ -42,9 +42,9 @@ const registerPhoneNumber = async (phoneNumberId, token) => {
   const data = await resp.json();
 
   if (!resp.ok) {
-    // ✅ Already registered → treat as success
-    if (data?.error?.code === 131045) {
-      console.log("✅ Number already registered");
+    // ✅ Already registered (131045) OR Two-step verification PIN Mismatch (133005, which means it's already active & registered via Cloud API)
+    if (data?.error?.code === 131045 || data?.error?.code === 133005) {
+      console.log(`✅ Number already active/registered (Meta Error Code: ${data?.error?.code})`);
       return { success: true };
     }
 
@@ -157,7 +157,9 @@ router.post(
       whatsappVerifiedName?.toLowerCase() === "test number" ||
       whatsappDisplayPhoneNumber?.replace(/\D/g, "").startsWith("1555");
 
-    if (!isTestNumber) {
+    const isAlreadyCloudAPI = phoneData?.platform_type === "CLOUD_API";
+
+    if (!isTestNumber && !isAlreadyCloudAPI) {
       const registration = await registerPhoneNumber(
         whatsappPhoneNumberId,
         whatsappAccessToken
@@ -170,7 +172,7 @@ router.post(
         });
       }
     } else {
-      console.log("⚠️ Test number detected, skipping registration");
+      console.log(`⚠️ Skipping registration. Test number: ${isTestNumber}, Already Cloud API: ${isAlreadyCloudAPI}`);
     }
 
     // 4️⃣ Attempt to Subscribe App
@@ -325,7 +327,9 @@ router.post(
       whatsappVerifiedName?.toLowerCase() === "test number" ||
       whatsappDisplayPhoneNumber?.replace(/\D/g, "").startsWith("1555");
 
-    if (!isTestNumber) {
+    const isAlreadyCloudAPI = phoneDetailData?.platform_type === "CLOUD_API";
+
+    if (!isTestNumber && !isAlreadyCloudAPI) {
       const registration = await registerPhoneNumber(
         whatsappPhoneNumberId,
         accessToken,
@@ -346,7 +350,7 @@ router.post(
         });
       }
     } else {
-      console.log("⚠️ Test number detected, skipping registration");
+      console.log(`⚠️ Skipping registration. Test number: ${isTestNumber}, Already Cloud API: ${isAlreadyCloudAPI}`);
     }
 
     /**

@@ -659,7 +659,7 @@ export default function TemplatesPage() {
       try {
         await api.delete(`/vendor/templates/${id}`);
         toast.success("Template deleted successfully");
-        setTemplates((prev) => prev.filter((t) => t.id !== id));
+        fetchTemplates(true); // Refresh list + limits counter together
       } catch (error: any) {
         toast.error(formatError(error, "Failed to delete template"));
       } finally {

@@ -1,4 +1,4 @@
-// Server entry point
+// Server entry point — restarted 2026-03-12
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -17,6 +17,8 @@ import whatsappTestRoutes from "./routes/whatsappTest.route.js";
 import vendorTemplateRoutes from "./routes/vendorTemplate.route.js";
 import vendorWhatsappTemplateSendRoutes from "./routes/vendorWhatsappTemplateSend.route.js";
 import workflowRoutes from "./routes/workflow.routes.js";
+import { getChatbotLimits } from "./controllers/workflow.controller.js";
+import { authenticate } from "./middleware/auth.middleware.js";
 import inboxRoutes from "./routes/inbox.route.js";
 import categoryRoutes from "./routes/category.routes.js";
 import leadRoutes from "./routes/lead.routes.js";
@@ -65,6 +67,8 @@ app.use("/api/vendor", vendorWhatsappRoutes);
 app.use("/api/vendor/whatsapp", vendorWhatsappMessageRoutes);
 app.use("/api/vendor/templates", vendorTemplateRoutes);
 app.use("/api/vendor/whatsapp/template", vendorWhatsappTemplateSendRoutes);
+// Register /limits BEFORE the router to prevent /:id from catching it
+app.get("/api/workflow/limits", authenticate, getChatbotLimits);
 app.use("/api/workflow", workflowRoutes);
 app.use("/api/inbox", inboxRoutes);
 app.use("/api/categories", categoryRoutes);
