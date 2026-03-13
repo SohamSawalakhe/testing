@@ -727,3 +727,74 @@ model SubscriptionPlan {
 
   vendors            Vendor[]
 }
+
+// ============================================================
+// WhatsApp Billing & Analytics Module
+// ============================================================
+
+// Tracks every WhatsApp message for billing purposes (separate from inbox Message model)
+model WhatsappMessage {
+  id              String   @id @default(cuid())
+  vendorId        String
+  waMessageId     String   @unique
+  phoneNumber     String
+  direction       String   // "outbound" | "inbound"
+  conversationId  String?  // Meta conversation ID
+  messageType     String?  // text, template, image, etc.
+  status          String?  // sent, delivered, read, failed
+  pricingCategory String?  // service, utility, marketing, authentication
+  createdAt       DateTime @default(now())
+
+  @@index([vendorId])
+  @@index([vendorId, createdAt])
+  @@index([phoneNumber])
+}
+
+// Tracks Meta WhatsApp conversation sessions with pricing
+model WhatsappConversation {
+  id              String   @id @default(cuid())
+  vendorId        String
+  conversationId  String   @unique // Meta's conversation ID
+  category        String   // service, utility, marketing, authentication
+  metaCost        Float    // Cost charged by Meta
+  chargedCost     Float    // Cost charged to vendor (Meta + platform markup)
+  billable        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([vendorId])
+  @@index([vendorId, createdAt])
+  @@index([category])
+}
+
+// Per-country WhatsApp pricing from Meta (base rates)
+model WhatsappPricing {
+  id              String @id @default(cuid())
+  country         String @unique
+  service         Float
+  utility         Float
+  marketing       Float
+  authentication  Float
+}
+
+// Vendor pre-paid wallet for WhatsApp billing
+model VendorWallet {
+  id        String   @id @default(cuid())
+  vendorId  String   @unique
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+// Wallet transaction ledger for audit trail
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  vendorId    String
+  amount      Float    // Positive = credit, negative = debit
+  type        String   // "debit" | "credit" | "refund"
+  description String?
+  reference   String?  // conversationId or manual reference
+  balanceAfter Float   // Snapshot of balance after this transaction
+  createdAt   DateTime @default(now())
+
+  @@index([vendorId])
+  @@index([vendorId, createdAt])
+}

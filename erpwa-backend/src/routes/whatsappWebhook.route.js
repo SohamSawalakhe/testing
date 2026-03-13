@@ -8,6 +8,10 @@ import {
   checkAndStartWorkflow,
   handleWorkflowResponse,
 } from "../services/workflowEngine.service.js";
+import {
+  trackMessage,
+  processConversationBilling,
+} from "../services/whatsappBilling.service.js";
 
 const router = express.Router();
 
@@ -390,6 +394,20 @@ router.post("/", async (req, res) => {
           whatsappBusinessId: wabaId,
           whatsappPhoneNumberId: phoneNumberId || vendor.whatsappPhoneNumberId,
         });
+
+        // 📊 Billing: Track inbound message for analytics
+        try {
+          await trackMessage({
+            vendorId: vendor.id,
+            waMessageId: whatsappMessageId,
+            phoneNumber: from,
+            direction: "inbound",
+            messageType: msg.type,
+            status: "received",
+          });
+        } catch (billingErr) {
+          console.error("⚠️ Billing trackMessage (inbound) error:", billingErr.message);
+        }
       }
     }
 
@@ -514,6 +532,42 @@ router.post("/", async (req, res) => {
             },
           );
         } catch { }
+
+        // ─── 📊 BILLING: Track message & process conversation ───
+        try {
+          // Extract conversation and pricing from status
+          const convData = waStatus.conversation;
+          const convId = convData?.id || null;
+          const pricingData = waStatus.pricing;
+          const pricingCategory = pricingData?.category?.toLowerCase() || null;
+          const billable = pricingData?.billable !== false;
+
+          // Track the message
+          await trackMessage({
+            vendorId,
+            waMessageId: whatsappMessageId,
+            phoneNumber,
+            direction: "outbound",
+            messageType: messageToUpdate.messageType || null,
+            status: waState,
+            conversationId: convId,
+            pricingCategory,
+          });
+
+          // Process conversation billing on first occurrence
+          if (convId && pricingCategory) {
+            await processConversationBilling({
+              vendorId,
+              conversationId: convId,
+              category: pricingCategory,
+              billable,
+              country: vendor.country || "India",
+            });
+          }
+        } catch (billingErr) {
+          console.error("⚠️ Billing processing error:", billingErr.message);
+          // Never fail the webhook due to billing errors
+        }
       }
     }
 
