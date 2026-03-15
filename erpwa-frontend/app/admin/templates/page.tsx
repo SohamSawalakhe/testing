@@ -298,6 +298,14 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     fetchTemplates();
+
+    const handlePlanUpdate = () => {
+      fetchTemplates(true); // silent fetch
+    };
+    window.addEventListener("vendor:plan_updated", handlePlanUpdate);
+    return () => {
+      window.removeEventListener("vendor:plan_updated", handlePlanUpdate);
+    };
   }, []);
 
   // Handle URL parameters for create/edit/send from Flows page

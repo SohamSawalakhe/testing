@@ -36,6 +36,7 @@ type Vendor = {
   subscriptionEnd?: string | null;
   userCount: number;
   owner: Owner | null;
+  subscriptionPlan?: { id: string; name: string } | null;
 };
 
 function getSubscriptionStatus(endDate?: string | null) {
@@ -69,6 +70,14 @@ export default function ActivatedVendorsPage() {
   const [allVendors, setAllVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [plans, setPlans] = useState<{ id: string; name: string }[]>([]);
+  const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get("/super-admin/subscription-plans")
+      .then((res) => setPlans(res.data))
+      .catch((err) => console.error("Failed to load plans", err));
+  }, []);
 
   const fetchVendors = useCallback(() => {
     setLoading(true);
@@ -286,8 +295,34 @@ export default function ActivatedVendorsPage() {
                             {label}
                           </span>
                           <span className="text-[10px] text-muted-foreground">
-                            {isUnlimited ? "Unlimited Access" : "15-day Trial"}
+                            {isUnlimited ? "Unlimited Access" : "Time Limited"}
                           </span>
+                          
+                          <div className="mt-1 flex items-center gap-2">
+                            {updatingPlan === v.id && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground mr-1" />}
+                            <select
+                              className="text-xs bg-background border border-border rounded px-1.5 py-1 focus:ring-1 focus:ring-primary w-full outline-none"
+                              value={v.subscriptionPlan?.id || ""}
+                              onChange={async (e) => {
+                                const newPlanId = e.target.value;
+                                if (!newPlanId) return;
+                                try {
+                                  setUpdatingPlan(v.id);
+                                  await api.put(`/super-admin/vendors/${v.id}/plan`, { subscriptionPlanId: newPlanId });
+                                  toast.success("Plan updated successfully");
+                                  fetchVendors();
+                                } catch (err: any) {
+                                  toast.error(err.response?.data?.message || "Failed to update plan");
+                                } finally {
+                                  setUpdatingPlan(null);
+                                }
+                              }}
+                              disabled={updatingPlan === v.id}
+                            >
+                              <option value="" disabled>Select Plan</option>
+                              {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          </div>
                         </div>
                       );
                     })()}
