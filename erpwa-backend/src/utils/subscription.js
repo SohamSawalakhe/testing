@@ -155,3 +155,53 @@ export async function hasChatbotLimitReached(vendorId) {
         return true;
     }
 }
+
+/**
+ * Validates if a vendor can add more gallery items.
+ * Throws an Error if the limit is exceeded.
+ */
+export async function enforceGalleryLimit(vendorId, amountToAdd = 1) {
+    const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        include: { subscriptionPlan: true },
+    });
+
+    if (!vendor) {
+        throw new Error("Vendor not found.");
+    }
+
+    if (!vendor.subscriptionPlan) {
+        throw new Error("No subscription plan assigned. Please contact support to activate your plan.");
+    }
+
+    const { galleryLimit, name } = vendor.subscriptionPlan;
+
+    if (galleryLimit === -1) return true; // Unlimited
+
+    const count = await prisma.galleryImage.count({
+        where: { vendorId }
+    });
+
+    if (count + amountToAdd > galleryLimit) {
+        const remaining = galleryLimit - count;
+        if (remaining <= 0) {
+            throw new Error(`Subscription limit reached. Your ${name} plan allows up to ${galleryLimit} gallery items.`);
+        } else {
+            throw new Error(`Limit exceeded. You can only add ${remaining} more item(s) on your ${name} plan.`);
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Check if gallery limit is reached (returns boolean instead of throwing).
+ */
+export async function hasGalleryLimitReached(vendorId) {
+    try {
+        await enforceGalleryLimit(vendorId, 1);
+        return false;
+    } catch (error) {
+        return true;
+    }
+}

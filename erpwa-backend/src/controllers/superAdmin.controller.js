@@ -7,6 +7,7 @@ import { passwordResetOtpTemplate } from "../emails/passwordResetOtp.template.js
 import crypto from "crypto";
 import { generateAccessToken, generateRefreshToken } from "../utils/token.js";
 import { hashToken } from "../utils/hash.js";
+import { getIO } from "../socket.js";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -156,6 +157,7 @@ export async function getVendors(req, res) {
           take: 1,
         },
         _count: { select: { users: true } },
+        subscriptionPlan: { select: { id: true, name: true } }
       },
     });
 
@@ -168,6 +170,7 @@ export async function getVendors(req, res) {
       createdAt: v.createdAt,
       subscriptionStart: v.subscriptionStart,
       subscriptionEnd: v.subscriptionEnd,
+      subscriptionPlan: v.subscriptionPlan,
       userCount: v._count.users,
       owner: v.users[0] ?? null,
     }));
@@ -289,6 +292,56 @@ export async function activateVendor(req, res) {
     });
   } catch (err) {
     console.error("activateVendor error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * PUT /api/super-admin/vendors/:id/plan
+ * Updates a vendor's subscription plan (Super Admin action)
+ * ============================================================ */
+export async function updateVendorPlan(req, res) {
+  try {
+    const { id } = req.params;
+    const { subscriptionPlanId } = req.body;
+
+    if (!subscriptionPlanId) {
+      return res.status(400).json({ message: "Subscription plan ID is required" });
+    }
+
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id: subscriptionPlanId } });
+    if (!plan) return res.status(404).json({ message: "Plan not found" });
+
+    // Set 30 day subscription length based on current date
+    const subscriptionStart = new Date();
+    const subscriptionEnd = new Date(subscriptionStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const updatedVendor = await prisma.vendor.update({
+      where: { id },
+      data: {
+        subscriptionPlanId,
+        subscriptionStart,
+        subscriptionEnd,
+      },
+      include: {
+        subscriptionPlan: true
+      }
+    });
+
+    try {
+      // Notify vendor users in real-time
+      const io = getIO();
+      if (io) {
+        io.to(`vendor:${id}`).emit("vendor:plan_updated", {
+          plan: plan,
+          subscriptionEnd
+        });
+      }
+    } catch(e) { console.error("Could not emit socket event", e)}
+
+    return res.json({ message: "Vendor plan updated", vendor: updatedVendor });
+  } catch (err) {
+    console.error("updateVendorPlan error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

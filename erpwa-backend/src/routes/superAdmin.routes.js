@@ -17,6 +17,7 @@ import {
   updateSubscriptionPlan,
   deleteSubscriptionPlan,
   initSubscriptionPlans,
+  updateVendorPlan
 } from "../controllers/superAdmin.controller.js";
 import { superAdminAuth } from "../middleware/superAdminAuth.middleware.js";
 
@@ -32,6 +33,7 @@ router.get("/me", superAdminAuth, superAdminMe);
 router.get("/vendors", superAdminAuth, getVendors);
 router.get("/vendors/:id/registration", superAdminAuth, getVendorRegistration);
 router.put("/vendors/:id/activate", superAdminAuth, activateVendor);
+router.put("/vendors/:id/plan", superAdminAuth, updateVendorPlan);
 router.get("/stats", superAdminAuth, getStats);
 
 /* ---- Profile ---- */
