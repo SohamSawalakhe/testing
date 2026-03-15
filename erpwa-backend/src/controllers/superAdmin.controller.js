@@ -364,15 +364,54 @@ export async function getVendorRegistration(req, res) {
  * ============================================================ */
 export async function getStats(req, res) {
   try {
-    const [vendors, users, leads] = await Promise.all([
+    const [vendors, users, leads, revenueData] = await Promise.all([
       prisma.vendor.count(),
       prisma.user.count(),
       prisma.lead.count(),
+      prisma.vendorPayment.aggregate({
+        where: { status: "captured" },
+        _sum: { amount: true }
+      })
     ]);
 
-    return res.json({ vendors, users, leads });
+    return res.json({ 
+      vendors, 
+      users, 
+      leads, 
+      totalRevenue: revenueData._sum.amount || 0 
+    });
   } catch (err) {
     console.error("getStats error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * GET /api/super-admin/payments
+ * Returns all vendor payments/transactions
+ * ============================================================ */
+export async function getPayments(req, res) {
+  try {
+    const payments = await prisma.vendorPayment.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
+        subscription: {
+          include: {
+            plan: true
+          }
+        }
+      }
+    });
+
+    return res.json(payments);
+  } catch (err) {
+    console.error("getPayments error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
@@ -581,7 +620,7 @@ export async function getSubscriptionPlans(req, res) {
  * ============================================================ */
 export async function createSubscriptionPlan(req, res) {
   try {
-    const { name, price, currency, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
+    const { name, price, currency, durationDays, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
 
     if (!name) return res.status(400).json({ message: "Plan name is required" });
 
@@ -592,7 +631,8 @@ export async function createSubscriptionPlan(req, res) {
       data: {
         name,
         price: price || 0,
-        currency: currency || "USD",
+        currency: currency || "INR",
+        durationDays: durationDays ?? 30,
         conversationLimit: conversationLimit ?? 100,
         galleryLimit: galleryLimit ?? 50,
         chatbotLimit: chatbotLimit ?? 1,
@@ -616,7 +656,7 @@ export async function createSubscriptionPlan(req, res) {
 export async function updateSubscriptionPlan(req, res) {
   try {
     const { id } = req.params;
-    const { name, price, currency, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
+    const { name, price, currency, durationDays, isActive, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
 
     const plan = await prisma.subscriptionPlan.findUnique({ where: { id } });
     if (!plan) return res.status(404).json({ message: "Subscription plan not found" });
@@ -632,6 +672,8 @@ export async function updateSubscriptionPlan(req, res) {
         name: name !== undefined ? name : plan.name,
         price: price !== undefined ? price : plan.price,
         currency: currency !== undefined ? currency : plan.currency,
+        durationDays: durationDays !== undefined ? durationDays : plan.durationDays,
+        isActive: isActive !== undefined ? isActive : plan.isActive,
         conversationLimit: conversationLimit !== undefined ? conversationLimit : plan.conversationLimit,
         galleryLimit: galleryLimit !== undefined ? galleryLimit : plan.galleryLimit,
         chatbotLimit: chatbotLimit !== undefined ? chatbotLimit : plan.chatbotLimit,
@@ -670,28 +712,85 @@ export async function deleteSubscriptionPlan(req, res) {
 
 /* ============================================================
  * POST /api/super-admin/subscription-plans/init
- * Initializes default subscription plans (Free, Basic, Premium, Unlimited)
+ * Initializes default subscription plans (Free, Basic, Custom)
  * ============================================================ */
 export async function initSubscriptionPlans(req, res) {
   try {
     const defaultPlans = [
-      { name: "Free", price: 0, conversationLimit: 100, galleryLimit: 50, chatbotLimit: 1, templateLimit: 5, formLimit: 2, teamUsersLimit: 1 },
-      { name: "Basic", price: 29, conversationLimit: 1000, galleryLimit: 500, chatbotLimit: 3, templateLimit: 20, formLimit: 5, teamUsersLimit: 3 },
-      { name: "Premium", price: 99, conversationLimit: 5000, galleryLimit: 2048, chatbotLimit: 10, templateLimit: 100, formLimit: 20, teamUsersLimit: 10 },
-      { name: "Unlimited", price: 299, conversationLimit: -1, galleryLimit: -1, chatbotLimit: -1, templateLimit: -1, formLimit: -1, teamUsersLimit: -1 },
+      { name: "Free", price: 0, currency: "INR", durationDays: 15, conversationLimit: 50, galleryLimit: 20, chatbotLimit: 1, templateLimit: 3, formLimit: 1, teamUsersLimit: 1 },
+      { name: "Basic", price: 1999, currency: "INR", durationDays: 30, conversationLimit: 500, galleryLimit: 100, chatbotLimit: 3, templateLimit: 10, formLimit: 5, teamUsersLimit: 3 },
+      { name: "Custom", price: 0, currency: "INR", durationDays: 30, conversationLimit: -1, galleryLimit: -1, chatbotLimit: -1, templateLimit: -1, formLimit: -1, teamUsersLimit: -1 },
     ];
 
     for (const plan of defaultPlans) {
       await prisma.subscriptionPlan.upsert({
         where: { name: plan.name },
-        update: {}, // Don't override if already exists or maybe we choose to override
+        update: plan,
         create: plan,
       });
     }
+
+    // Optionally remove Premium if it exists
+    await prisma.subscriptionPlan.deleteMany({
+      where: { name: "Premium" }
+    });
 
     return res.json({ message: "Default subscription plans initialized" });
   } catch (err) {
     console.error("initSubscriptionPlans error:", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+}
+/* ============================================================
+ * GET /api/super-admin/invoice/:paymentId
+ * Returns full invoice details for a specific payment (Super Admin)
+ * ============================================================ */
+export async function getInvoice(req, res) {
+  try {
+    const { paymentId } = req.params;
+    const payment = await prisma.vendorPayment.findFirst({
+      where: { id: paymentId },
+      include: {
+        vendor: { select: { name: true } },
+        subscription: {
+          include: { 
+            plan: { 
+              select: { 
+                name: true, 
+                price: true, 
+                currency: true, 
+                durationDays: true 
+              } 
+            } 
+          }
+        },
+      },
+    });
+
+    if (!payment) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    return res.json({
+      id: payment.id,
+      invoiceNumber: payment.invoiceNumber || `TXN-${payment.id.slice(0, 8).toUpperCase()}`,
+      invoiceDate: payment.invoiceDate || payment.createdAt,
+      status: payment.status,
+      billingName: payment.billingName || payment.vendor?.name || "Customer",
+      billingEmail: payment.billingEmail || null,
+      planName: payment.planName || payment.subscription?.plan?.name || "Plan",
+      planDuration: payment.planDuration || payment.subscription?.plan?.durationDays || 30,
+      amount: payment.amount,
+      taxAmount: payment.taxAmount || 0,
+      totalAmount: payment.amount + (payment.taxAmount || 0),
+      currency: payment.currency,
+      gateway: payment.gateway,
+      razorpayOrderId: payment.razorpayOrderId,
+      razorpayPaymentId: payment.razorpayPaymentId,
+      createdAt: payment.createdAt,
+    });
+  } catch (err) {
+    console.error("getInvoice Super Admin error:", err);
+    return res.status(500).json({ message: "Failed to fetch invoice" });
   }
 }

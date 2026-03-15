@@ -22,6 +22,7 @@ import {
   Activity,
   Layers,
   Lock,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/sidebar-provider";
@@ -45,6 +46,7 @@ const menuItems = [
   { href: "/admin/activity-logs", icon: Activity, label: "Activity Logs" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
+
 
 export function SidebarAdmin() {
   const pathname = usePathname();

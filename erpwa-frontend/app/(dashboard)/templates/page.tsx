@@ -1096,17 +1096,13 @@ export default function TemplatesPage() {
                               {t.displayName}
                             </h3>
                           </div>
-                          <div className="shrink-0">
-                            {t.isMetaOnly ? (
-                              <Badge
-                                variant="outline"
-                                className="border-blue-200 bg-blue-50 text-blue-700 text-[10px]"
-                              >
+                          <div className="shrink-0 flex items-center gap-2">
+                            {t.isMetaOnly && (
+                              <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px]">
                                 Meta
                               </Badge>
-                            ) : (
-                              getStatusBadge(t.status)
                             )}
+                            {getStatusBadge(t.status)}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">

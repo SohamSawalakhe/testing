@@ -12,6 +12,7 @@ import {
   Clock,
   ShieldCheck,
   Zap,
+  CreditCard,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ type NavItem = {
 const topMenuItems: NavItem[] = [
   { href: "/admin-super/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/admin-super/plans", icon: Zap, label: "Plans" },
+  { href: "/admin-super/transactions", icon: CreditCard, label: "Transactions" },
 ];
 
 const bottomMenuItems: NavItem[] = [
