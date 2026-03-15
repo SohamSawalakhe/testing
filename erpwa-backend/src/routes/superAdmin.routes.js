@@ -17,6 +17,7 @@ import {
   updateSubscriptionPlan,
   deleteSubscriptionPlan,
   initSubscriptionPlans,
+  updateVendorPlan,
   getPayments,
   getInvoice,
 } from "../controllers/superAdmin.controller.js";
