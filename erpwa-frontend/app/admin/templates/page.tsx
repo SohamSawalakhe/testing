@@ -257,13 +257,13 @@ export default function TemplatesPage() {
 
       const media = headerMediaUrl
         ? [
-          {
-            id: `meta-media-${metaTpl.id}`,
-            mediaType: headerType.toLowerCase(),
-            s3Url: headerMediaUrl,
-            language: metaTpl.language,
-          },
-        ]
+            {
+              id: `meta-media-${metaTpl.id}`,
+              mediaType: headerType.toLowerCase(),
+              s3Url: headerMediaUrl,
+              language: metaTpl.language,
+            },
+          ]
         : [];
 
       return {
@@ -506,10 +506,10 @@ export default function TemplatesPage() {
           prev.map((t) =>
             t.id === editId
               ? {
-                ...t,
-                displayName: formData.displayName,
-                category: formData.category,
-              }
+                  ...t,
+                  displayName: formData.displayName,
+                  category: formData.category,
+                }
               : t,
           ),
         );
@@ -793,7 +793,7 @@ export default function TemplatesPage() {
 
   const handleCardClick = (template: Template) => {
     if (template.isMetaOnly) {
-      handleMetaSyncStatus(template, { stopPropagation: () => { } } as any);
+      handleMetaSyncStatus(template, { stopPropagation: () => {} } as any);
       return;
     }
 
@@ -893,7 +893,8 @@ export default function TemplatesPage() {
           toast.error(`Failed to send: ${firstError}`);
         } else {
           toast.warning(
-            `${results.length - failed.length} sent, ${failed.length
+            `${results.length - failed.length} sent, ${
+              failed.length
             } failed. First error: ${firstError}`,
           );
         }
@@ -909,22 +910,25 @@ export default function TemplatesPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    const s = status?.toLowerCase();
+    switch (s) {
       case "approved":
+      case "published":
         return (
-          <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-            Approved
+          <Badge className="bg-green-500/10 text-green-600 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+            {s === "published" ? "Published" : "Approved"}
           </Badge>
         );
       case "rejected":
+      case "deprecated":
         return (
-          <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-            Rejected
+          <Badge className="bg-red-500/10 text-red-600 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+            {s === "deprecated" ? "Deprecated" : "Rejected"}
           </Badge>
         );
       case "pending":
         return (
-          <Badge className="bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+          <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
             Pending
           </Badge>
         );
@@ -1211,17 +1215,17 @@ export default function TemplatesPage() {
                             {(t.languages[0]?.headerType !== "TEXT" ||
                               t.templateType === "catalog" ||
                               t.templateType === "carousel") && (
-                                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                                  {t.languages[0]?.headerType === "IMAGE" ? (
-                                    <ImageIcon className="w-3 h-3" />
-                                  ) : (
-                                    <Paperclip className="w-3 h-3" />
-                                  )}
-                                  {t.languages[0]?.headerType !== "TEXT"
-                                    ? t.languages[0]?.headerType
-                                    : t.templateType}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                {t.languages[0]?.headerType === "IMAGE" ? (
+                                  <ImageIcon className="w-3 h-3" />
+                                ) : (
+                                  <Paperclip className="w-3 h-3" />
+                                )}
+                                {t.languages[0]?.headerType !== "TEXT"
+                                  ? t.languages[0]?.headerType
+                                  : t.templateType}
+                              </div>
+                            )}
                             <p className="line-clamp-4 whitespace-pre-wrap">
                               {t.languages[0]?.body || "No content"}
                             </p>
@@ -1291,9 +1295,9 @@ export default function TemplatesPage() {
                             disabled={!!syncing || !!submitting}
                           >
                             {syncing === t.id ||
-                              syncing === t.metaTemplateName ||
-                              submitting === t.id ||
-                              importing === t.id ? (
+                            syncing === t.metaTemplateName ||
+                            submitting === t.id ||
+                            importing === t.id ? (
                               <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
                             ) : t.isMetaOnly ? (
                               <RefreshCw className="w-3 h-3 mr-1.5" />
@@ -1744,7 +1748,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                    selectedSubCategory),
+                                      selectedSubCategory),
                               ).length > 0 &&
                               leads
                                 .filter(
@@ -1762,7 +1766,7 @@ export default function TemplatesPage() {
                                       l.category_name === selectedCategory) &&
                                     (!selectedSubCategory ||
                                       l.sub_category_name ===
-                                      selectedSubCategory),
+                                        selectedSubCategory),
                                 )
                                 .every((l) =>
                                   recipientList.includes(l.mobile_number),
@@ -1780,7 +1784,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                    selectedSubCategory),
+                                      selectedSubCategory),
                               );
                               const allSelected = filtered.every((l) =>
                                 recipientList.includes(l.mobile_number),
@@ -1822,7 +1826,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                    selectedSubCategory),
+                                      selectedSubCategory),
                               ).length
                             }
                             )
@@ -1870,7 +1874,7 @@ export default function TemplatesPage() {
                                 checked={recipientList.includes(
                                   lead.mobile_number,
                                 )}
-                                onChange={() => { }} // handled by parent div click
+                                onChange={() => {}} // handled by parent div click
                                 className="pointer-events-none"
                               />
                               <div className="flex flex-col">
@@ -2341,19 +2345,19 @@ export default function TemplatesPage() {
                               />
                               {(btn.type === "URL" ||
                                 btn.type === "PHONE_NUMBER") && (
-                                  <Input
-                                    className="h-8 text-sm"
-                                    placeholder={
-                                      btn.type === "URL"
-                                        ? "https://website.com"
-                                        : "+1234567890"
-                                    }
-                                    value={btn.value}
-                                    onChange={(e) =>
-                                      updateButton(idx, "value", e.target.value)
-                                    }
-                                  />
-                                )}
+                                <Input
+                                  className="h-8 text-sm"
+                                  placeholder={
+                                    btn.type === "URL"
+                                      ? "https://website.com"
+                                      : "+1234567890"
+                                  }
+                                  value={btn.value}
+                                  onChange={(e) =>
+                                    updateButton(idx, "value", e.target.value)
+                                  }
+                                />
+                              )}
                             </div>
                             <Button
                               variant="ghost"
@@ -2412,34 +2416,34 @@ export default function TemplatesPage() {
                             {/* Header Media */}
                             {(formData.headerType === "IMAGE" ||
                               formData.headerType === "VIDEO") && (
-                                <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
-                                  {headerPreview ? (
-                                    formData.headerType === "VIDEO" ? (
-                                      <video
-                                        src={headerPreview}
-                                        className="w-full h-full object-contain"
-                                      />
-                                    ) : (
-                                      <img
-                                        src={headerPreview}
-                                        alt="Header"
-                                        className="w-full h-full object-contain"
-                                      />
-                                    )
+                              <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
+                                {headerPreview ? (
+                                  formData.headerType === "VIDEO" ? (
+                                    <video
+                                      src={headerPreview}
+                                      className="w-full h-full object-contain"
+                                    />
                                   ) : (
-                                    <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
-                                      {formData.headerType === "IMAGE" ? (
-                                        <ImageIcon className="w-6 h-6" />
-                                      ) : (
-                                        <Video className="w-6 h-6" />
-                                      )}
-                                      <span className="text-[8px] font-bold uppercase">
-                                        {formData.headerType}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                    <img
+                                      src={headerPreview}
+                                      alt="Header"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  )
+                                ) : (
+                                  <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
+                                    {formData.headerType === "IMAGE" ? (
+                                      <ImageIcon className="w-6 h-6" />
+                                    ) : (
+                                      <Video className="w-6 h-6" />
+                                    )}
+                                    <span className="text-[8px] font-bold uppercase">
+                                      {formData.headerType}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             {/* Header Text */}
                             {formData.headerType === "TEXT" &&

@@ -13,7 +13,9 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  CreditCard,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "react-toastify";
 
 type Owner = {
@@ -182,6 +184,9 @@ export default function ActivatedVendorsPage() {
                 <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Subscription
                 </th>
+                <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -322,6 +327,15 @@ export default function ActivatedVendorsPage() {
                       );
                     })()}
                   </td>
+                  <td className="px-5 py-4 text-right">
+                      <Link
+                        href={`/admin-super/transactions?search=${encodeURIComponent(v.name)}`}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-600 hover:underline"
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        Transactions
+                      </Link>
+                    </td>
                 </tr>
               ))}
             </tbody>

@@ -1,3 +1,6 @@
+// Run: node scripts/seed-plans.js
+// Seeds or updates subscription plans with correct durationDays and isActive
+
 import prisma from "../src/prisma.js";
 
 async function main() {
@@ -7,16 +10,26 @@ async function main() {
         { name: "Unlimited", price: 299, conversationLimit: -1, galleryLimit: -1, chatbotLimit: -1, templateLimit: -1, formLimit: -1, teamUsersLimit: -1 },
     ];
 
-    for (const plan of defaultPlans) {
-        await prisma.subscriptionPlan.upsert({
-            where: { name: plan.name },
-            update: plan,
-            create: plan,
-        });
-        console.log(`Upserted plan: ${plan.name}`);
+async function seedPlans() {
+  console.log("Seeding subscription plans...");
+  for (const plan of plans) {
+    const existing = await prisma.subscriptionPlan.findUnique({ where: { name: plan.name } });
+    if (existing) {
+      await prisma.subscriptionPlan.update({
+        where: { name: plan.name },
+        data: plan,
+      });
+      console.log(`✅ Updated: ${plan.name}`);
+    } else {
+      await prisma.subscriptionPlan.create({ data: plan });
+      console.log(`✅ Created: ${plan.name}`);
     }
+  }
+  console.log("Done!");
+  await prisma.$disconnect();
 }
 
-main()
-    .catch(console.error)
-    .finally(() => prisma.$disconnect());
+seedPlans().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

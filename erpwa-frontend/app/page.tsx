@@ -296,8 +296,8 @@ export default function LandingPage() {
               transition={{ duration: 0.7 }}
               className="relative"
             >
-              {/* Premium Glass Card for Workflow Visual */}
-              <div className="relative aspect-square rounded-3xl overflow-hidden border border-white/10 bg-slate-900/40 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col">
+              {/* Basic Glass Card for Workflow Visual */}
+              <div className="relative aspect-square rounded-3xl overflow-hidden border border-white/10 bg-slate-900/40 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(59,130,246,0.15)] flex flex-col">
                 <div className="p-4 border-b border-white/5 flex items-center gap-2 bg-white/5">
                   <div className="flex gap-1.5">
                     <div className="w-3 h-3 rounded-full bg-red-500/50" />
@@ -419,36 +419,37 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start max-w-md md:max-w-4xl lg:max-w-none mx-auto">
             <PricingCard
-              title="Starter"
-              price="$29"
-              description="Perfect for small businesses starting with WhatsApp API."
+              title="Free"
+              price="₹0"
+              description="Perfect for exploring the platform and testing your flows."
               features={[
-                "1 WhatsApp API Number",
-                "Green Tick Assistance",
-                "Basic Unified Inbox",
-                "Campaign Broadcasts",
-                "Meta Chat Fees Billed Separately",
+                "50 Conversations",
+                "20 Media Items",
+                "1 Chatbot",
+                "3 Message Templates",
+                "1 Team Member",
+                "15 Days Validity",
               ]}
-              buttonText="Start free trial"
-              href="/register?plan=starter"
+              buttonText="Get Started"
+              href="/register"
+              isPrimary={true}
               delay={0}
             />
 
             <PricingCard
-              title="Professional"
-              price="$79"
-              description="For growing businesses needing automation and flows."
+              title="Basic"
+              price="₹1999"
+              description="Perfect for small businesses starting with WhatsApp API."
               features={[
-                "Up to 3 WhatsApp Numbers",
-                "Drag & Drop Flow Builder",
-                "CRM Integrations",
-                "Interactive Catalogs",
-                "Unlimited Team Members",
-                "Advanced Analytics",
+                "500 Conversations",
+                "100 Media Items",
+                "3 Chatbots",
+                "10 Message Templates",
+                "3 Team Members",
                 "Meta Chat Fees Billed Separately",
               ]}
-              buttonText="Start Free Trial"
-              href="/register?plan=pro"
+              buttonText="Start free trial"
+              href="/register?plan=basic"
               featured={true}
               delay={0.1}
             />
@@ -700,6 +701,7 @@ interface PricingCardProps {
   href: string;
   featured?: boolean;
   isEnterprise?: boolean;
+  isPrimary?: boolean;
   delay: number;
 }
 
@@ -712,6 +714,7 @@ function PricingCard({
   href,
   featured = false,
   isEnterprise = false,
+  isPrimary = false,
   delay,
 }: PricingCardProps) {
   return (
@@ -722,7 +725,7 @@ function PricingCard({
       transition={{ delay, duration: 0.5 }}
       className={`group relative h-full rounded-3xl p-px ${
         featured
-          ? "shadow-2xl shadow-purple-900/40 z-10 scale-105"
+          ? "shadow-2xl shadow-blue-900/40 z-10 scale-105"
           : "shadow-xl shadow-black/50 z-0"
       }`}
     >
@@ -738,10 +741,10 @@ function PricingCard({
           className="absolute -inset-full animate-[spin_4s_linear_infinite]"
           style={{
             background: featured
-              ? "conic-gradient(from 0deg, transparent 0 340deg, #A855F7 360deg)"
+              ? "conic-gradient(from 0deg, transparent 0 340deg, #3B82F6 360deg)"
               : isEnterprise
                 ? "conic-gradient(from 0deg, transparent 0 340deg, #10B981 360deg)"
-                : "conic-gradient(from 0deg, transparent 0 340deg, #3B82F6 360deg)",
+                : "conic-gradient(from 0deg, transparent 0 340deg, #8B5CF6 360deg)",
           }}
         />
       </div>
@@ -750,7 +753,7 @@ function PricingCard({
       <div
         className={`absolute inset-0 rounded-3xl transition-opacity duration-300 pointer-events-none ${
           featured
-            ? "border border-purple-500/30 opacity-0 group-hover:opacity-100"
+            ? "border border-blue-500/30 opacity-0 group-hover:opacity-100"
             : "border border-white/5 opacity-100 group-hover:opacity-0"
         }`}
       />
@@ -766,16 +769,16 @@ function PricingCard({
         {/* Soft Inner Glow */}
         <div
           className={`absolute inset-0 bg-linear-to-b opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${
-            featured
-              ? "from-purple-500/10 to-transparent"
+            featured || isPrimary
+              ? "from-blue-500/10 to-transparent"
               : isEnterprise
                 ? "from-emerald-500/10 to-transparent"
-                : "from-blue-500/5 to-transparent"
+                : "from-purple-500/5 to-transparent"
           }`}
         />
 
         {featured && (
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-linear-to-r from-purple-600 to-blue-600 text-white px-4 py-1 rounded-b-xl text-xs font-bold uppercase tracking-wide shadow-lg border-x border-b border-purple-400/30">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-linear-to-r from-blue-600 to-cyan-600 text-white px-4 py-1 rounded-b-xl text-xs font-bold uppercase tracking-wide shadow-lg border-x border-b border-blue-400/30">
             Most Popular
           </div>
         )}
@@ -784,10 +787,10 @@ function PricingCard({
           <h3
             className={`text-lg font-bold mb-2 transition-colors duration-300 ${
               featured
-                ? "text-purple-300"
+                ? "text-blue-300"
                 : isEnterprise
                   ? "text-slate-300 group-hover:text-emerald-400"
-                  : "text-slate-300 group-hover:text-blue-300"
+                  : "text-slate-300 group-hover:text-purple-300"
             }`}
           >
             {title}
@@ -816,10 +819,10 @@ function PricingCard({
               <CheckCircle2
                 className={`w-5 h-5 shrink-0 transition-colors duration-300 ${
                   featured
-                    ? "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                    ? "text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
                     : isEnterprise
                       ? "text-emerald-500/70 group-hover:text-emerald-400"
-                      : "text-blue-500/70 group-hover:text-blue-400"
+                      : "text-purple-500/70 group-hover:text-purple-400"
                 }`}
               />
               <span className="leading-tight">{feature}</span>
@@ -830,11 +833,11 @@ function PricingCard({
         <Link href={href} className="w-full relative z-10 mt-auto">
           <button
             className={`w-full py-4 rounded-xl font-bold transition-all cursor-pointer relative overflow-hidden group/btn ${
-              featured
-                ? "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_30px_rgba(168,85,247,0.6)]"
+              featured || isPrimary
+                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)]"
                 : isEnterprise
                   ? "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-emerald-500/50"
-                  : "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-blue-500/50"
+                  : "bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-purple-500/50"
             }`}
           >
             <span className="relative z-10 flex items-center justify-center gap-2">

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api, { setAccessToken } from "@/lib/api";
+import { AxiosError } from "axios";
+import api, { setSuperAdminAccessToken } from "@/lib/api";
 import { ShieldCheck, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -19,7 +20,7 @@ export default function SuperAdminLoginPage() {
       try {
         await api.get("/super-admin/me");
         router.push("/admin-super/dashboard");
-      } catch (err) {
+      } catch {
         setInitialLoading(false);
       }
     };
@@ -31,11 +32,13 @@ export default function SuperAdminLoginPage() {
     setLoading(true);
     try {
       const res = await api.post("/super-admin/login", { email, password });
-      setAccessToken(res.data.accessToken);
+      setSuperAdminAccessToken(res.data.accessToken);
       toast.success("Welcome back, Super Admin!");
       router.push("/admin-super/dashboard");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Login failed");
+    } catch (err: unknown) {
+      const message =
+        err instanceof AxiosError ? err.response?.data?.message : "Login failed";
+      toast.error(message || "Login failed");
     } finally {
       setLoading(false);
     }

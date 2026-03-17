@@ -29,7 +29,16 @@ export default function SubscriptionPlansPage() {
         setLoading(true);
         api
             .get("/super-admin/subscription-plans")
-            .then((r) => setPlans(r.data))
+            .then((r) => {
+                const allPlans = r.data as SubscriptionPlan[];
+                const order = ["Free", "Basic", "Custom", "Unlimited"];
+                const sorted = [...allPlans].sort((a, b) => {
+                    const idxA = order.indexOf(a.name);
+                    const idxB = order.indexOf(b.name);
+                    return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+                });
+                setPlans(sorted);
+            })
             .catch(() => toast.error("Failed to load subscription plans"))
             .finally(() => setLoading(false));
     }, []);
@@ -122,8 +131,12 @@ export default function SubscriptionPlansPage() {
                                     <div>
                                         <h3 className="text-xl font-bold text-foreground uppercase tracking-wide">{plan.name}</h3>
                                         <div className="mt-2 flex items-baseline text-3xl font-bold text-foreground">
-                                            ${plan.price}
-                                            <span className="ml-1 text-sm font-medium text-muted-foreground">/mo</span>
+                                            {plan.name === "Unlimited" || plan.name === "Custom" 
+                                                ? "Custom" 
+                                                : `${plan.currency === 'INR' ? '₹' : '$'}${plan.price}`}
+                                            {!(plan.name === "Unlimited" || plan.name === "Custom") && (
+                                                <span className="ml-1 text-sm font-medium text-muted-foreground">/mo</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -191,7 +204,7 @@ export default function SubscriptionPlansPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-medium text-foreground">Price ($/mo)</label>
+                                    <label className="text-xs font-medium text-foreground">Price (₹/mo)</label>
                                     <input
                                         type="number"
                                         required

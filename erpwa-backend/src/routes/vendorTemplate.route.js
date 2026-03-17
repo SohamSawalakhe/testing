@@ -150,7 +150,7 @@ router.get(
     try {
       // Fetch templates from Meta API
       const metaResp = await fetch(
-        `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?fields=name,components,language,status,category,id&limit=100`,
+        `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?fields=name,components,language,status,category,id&limit=500`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         },

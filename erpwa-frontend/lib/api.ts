@@ -4,12 +4,17 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 
-/* ================= ACCESS TOKEN (IN MEMORY) ================= */
+/* ================= ACCESS TOKENS (IN MEMORY) ================= */
 
-let accessToken: string | null = null;
+let userAccessToken: string | null = null;
+let superAdminAccessToken: string | null = null;
 
 export function setAccessToken(token: string | null) {
-  accessToken = token;
+  userAccessToken = token;
+}
+
+export function setSuperAdminAccessToken(token: string | null) {
+  superAdminAccessToken = token;
 }
 
 /* ================= AXIOS INSTANCES ================= */
@@ -24,35 +29,64 @@ const refreshApi = axios.create({
   withCredentials: true,
 });
 
+/* ================= UTILS ================= */
+
+const checkIsSuperAdminRoute = (url: string) => {
+  // 1. Check direct URL
+  const cleanUrl = url.startsWith("/") ? url.substring(1) : url;
+  if (cleanUrl.startsWith("super-admin")) return true;
+
+  // 2. Check window location as fallback (for components that might use relative paths)
+  if (typeof window !== "undefined") {
+    if (window.location.pathname.startsWith("/admin-super")) return true;
+  }
+
+  return false;
+};
+
 /* ================= REQUEST INTERCEPTOR ================= */
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Only add accessToken if Authorization header is not already set
-    // This allows manual override (e.g., for password reset with resetToken)
-    if (accessToken && config.headers && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+    const url = config.url || "";
+    const isSuperAdminRoute = checkIsSuperAdminRoute(url);
+    const token = isSuperAdminRoute ? superAdminAccessToken : userAccessToken;
+
+    // Only add token if Authorization header is not already set
+    if (token && config.headers && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
   (error) => Promise.reject(error),
 );
 
-/* ================= REFRESH QUEUE ================= */
+/* ================= REFRESH QUEUES ================= */
 
-let isRefreshing = false;
-
-let failedQueue: {
+let isRefreshingUser = false;
+let userFailedQueue: {
   resolve: (token: string) => void;
   reject: (error: AxiosError) => void;
 }[] = [];
 
-const processQueue = (error: AxiosError | null, token: string | null) => {
-  failedQueue.forEach((p) => {
+let isRefreshingSA = false;
+let saFailedQueue: {
+  resolve: (token: string) => void;
+  reject: (error: AxiosError) => void;
+}[] = [];
+
+const processQueue = (
+  error: AxiosError | null,
+  token: string | null,
+  isSA: boolean,
+) => {
+  const queue = isSA ? saFailedQueue : userFailedQueue;
+  queue.forEach((p) => {
     if (error) p.reject(error);
     else if (token) p.resolve(token);
   });
-  failedQueue = [];
+  if (isSA) saFailedQueue = [];
+  else userFailedQueue = [];
 };
 
 /* ================= RESPONSE INTERCEPTOR ================= */
@@ -70,6 +104,7 @@ api.interceptors.response.use(
     }
 
     const url = originalRequest.url || "";
+    const isSuperAdminRoute = checkIsSuperAdminRoute(url);
 
     /* 🚫 NEVER refresh for these routes:
        - auth endpoints (would cause loops) */
@@ -82,10 +117,7 @@ api.interceptors.response.use(
       url.includes("/super-admin/refresh")
     ) {
       // ✅ Redirect super-admin to login if auth loops
-      if (
-        url.includes("/super-admin/") &&
-        error.response?.status === 401
-      ) {
+      if (isSuperAdminRoute && error.response?.status === 401) {
         if (
           typeof window !== "undefined" &&
           window.location.pathname.startsWith("/admin-super")
@@ -96,10 +128,14 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (error.response.status === 401) {
+    // Handle 401 (Expired Token) or 403 (Wrong token type for route)
+    if (error.response.status === 401 || error.response.status === 403) {
+      const isRefreshing = isSuperAdminRoute ? isRefreshingSA : isRefreshingUser;
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
-          failedQueue.push({
+          const queue = isSuperAdminRoute ? saFailedQueue : userFailedQueue;
+          queue.push({
             resolve: (token: string) => {
               if (originalRequest.headers) {
                 originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -112,41 +148,61 @@ api.interceptors.response.use(
       }
 
       originalRequest._retry = true;
-      isRefreshing = true;
+      if (isSuperAdminRoute) isRefreshingSA = true;
+      else isRefreshingUser = true;
 
       try {
-        const isSuperAdminRoute = url.includes("/super-admin/");
-        const refreshEndpoint = isSuperAdminRoute ? "/super-admin/refresh" : "/auth/refresh";
+        const refreshEndpoint = isSuperAdminRoute
+          ? "/super-admin/refresh"
+          : "/auth/refresh";
 
         const res = await refreshApi.post<{ accessToken: string }>(
           refreshEndpoint,
         );
 
         const newToken = res.data.accessToken;
-        setAccessToken(newToken);
 
-        processQueue(null, newToken);
+        // Save to the correct role slot
+        if (isSuperAdminRoute) {
+          setSuperAdminAccessToken(newToken);
+        } else {
+          setAccessToken(newToken);
+        }
+
+        processQueue(null, newToken, isSuperAdminRoute);
 
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
         }
 
         return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError as AxiosError, null);
-        setAccessToken(null);
+      } catch (refreshError: unknown) {
+        processQueue(refreshError as AxiosError, null, isSuperAdminRoute);
+
+        // Clear appropriate token
+        if (isSuperAdminRoute) {
+          setSuperAdminAccessToken(null);
+        } else {
+          setAccessToken(null);
+        }
 
         // Only log out if it's an auth error (not a 500/timeout)
-        const status = (refreshError as AxiosError).response?.status;
-        if (status === 401 || status === 403) {
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("auth:logout"));
+        if (refreshError instanceof AxiosError) {
+          const status = refreshError.response?.status;
+          if (status === 401 || status === 403) {
+            if (typeof window !== "undefined") {
+              const logoutEvent = isSuperAdminRoute
+                ? "sa:auth:logout"
+                : "auth:logout";
+              window.dispatchEvent(new Event(logoutEvent));
+            }
           }
         }
 
         return Promise.reject(refreshError);
       } finally {
-        isRefreshing = false;
+        if (isSuperAdminRoute) isRefreshingSA = false;
+        else isRefreshingUser = false;
       }
     }
 
@@ -157,5 +213,9 @@ api.interceptors.response.use(
 export default api;
 
 export function getAccessToken() {
-  return accessToken;
+  return userAccessToken;
+}
+
+export function getSuperAdminAccessToken() {
+  return superAdminAccessToken;
 }
