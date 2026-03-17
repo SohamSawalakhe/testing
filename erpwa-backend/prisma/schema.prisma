@@ -33,6 +33,7 @@ model Vendor {
   // Subscription Fields
   subscriptionStart     DateTime?
   subscriptionEnd       DateTime?
+  subscriptionExpiredMailSent Boolean @default(false)
   subscriptionPlanId    String?
   subscriptionPlan      SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id])
 

@@ -132,6 +132,24 @@ router.post("/", async (req, res) => {
 
     vendorId = vendor.id;
 
+    // 🛡️ Subscription Check for Webhook
+    const isExpired = vendor.subscriptionEnd && new Date(vendor.subscriptionEnd).getTime() <= new Date().getTime();
+    if (isExpired && value.messages?.length) {
+      await logActivity({
+        vendorId,
+        whatsappBusinessId: wabaId,
+        whatsappPhoneNumberId: phoneNumberId,
+        event: "rejected",
+        status: "ignored",
+        payload: req.body,
+        responseCode: 200,
+        error: "Subscription expired - incoming message ignored",
+        processingMs: Date.now() - startTime,
+        type: "webhook",
+      });
+      return res.sendStatus(200);
+    }
+
     /* =====================================================
        1️⃣ HANDLE INBOUND CUSTOMER MESSAGES
     ===================================================== */
@@ -427,6 +445,50 @@ router.post("/", async (req, res) => {
         phoneNumber = waStatus.recipient_id;
         messageId = whatsappMessageId; // Always use WAMID
 
+        // ─── 📊 BILLING: Track message & process conversation ───
+        // MUST run before any `continue` — Meta sends conversation/pricing on "sent" status
+        try {
+          const convData = waStatus.conversation;
+          const convId = convData?.id || null;
+          const pricingData = waStatus.pricing;
+          const pricingCategory = pricingData?.category?.toLowerCase() || null;
+          const billable = pricingData?.billable !== false;
+
+          // Track the message (idempotent upsert)
+          await trackMessage({
+            vendorId,
+            waMessageId: whatsappMessageId,
+            phoneNumber,
+            direction: "outbound",
+            messageType: null,
+            status: waState,
+            conversationId: convId,
+            pricingCategory,
+          });
+
+          // Process conversation billing on first occurrence
+          if (convId && pricingCategory) {
+            await processConversationBilling({
+              vendorId,
+              conversationId: convId,
+              category: pricingCategory,
+              billable,
+              country: vendor.country || "India",
+            });
+          }
+
+          if (convId || pricingCategory) {
+            console.log(
+              `📊 [Billing] vendor=${vendorId} | msg=${whatsappMessageId} | ` +
+              `status=${waState} | conv=${convId || "N/A"} | ` +
+              `category=${pricingCategory || "N/A"}`
+            );
+          }
+        } catch (billingErr) {
+          console.error("⚠️ Billing processing error:", billingErr.message);
+          // Never fail the webhook due to billing errors
+        }
+
         // Log "sent" status
         if (waState === "sent") {
           await logActivity({
@@ -532,42 +594,6 @@ router.post("/", async (req, res) => {
             },
           );
         } catch { }
-
-        // ─── 📊 BILLING: Track message & process conversation ───
-        try {
-          // Extract conversation and pricing from status
-          const convData = waStatus.conversation;
-          const convId = convData?.id || null;
-          const pricingData = waStatus.pricing;
-          const pricingCategory = pricingData?.category?.toLowerCase() || null;
-          const billable = pricingData?.billable !== false;
-
-          // Track the message
-          await trackMessage({
-            vendorId,
-            waMessageId: whatsappMessageId,
-            phoneNumber,
-            direction: "outbound",
-            messageType: messageToUpdate.messageType || null,
-            status: waState,
-            conversationId: convId,
-            pricingCategory,
-          });
-
-          // Process conversation billing on first occurrence
-          if (convId && pricingCategory) {
-            await processConversationBilling({
-              vendorId,
-              conversationId: convId,
-              category: pricingCategory,
-              billable,
-              country: vendor.country || "India",
-            });
-          }
-        } catch (billingErr) {
-          console.error("⚠️ Billing processing error:", billingErr.message);
-          // Never fail the webhook due to billing errors
-        }
       }
     }
 

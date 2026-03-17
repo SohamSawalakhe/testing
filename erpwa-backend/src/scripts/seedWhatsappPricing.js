@@ -12,10 +12,10 @@ import prisma from "../prisma.js";
 
 const DEFAULT_PRICING = {
   country: "India",
-  service: 0.14,
-  utility: 0.30,
-  marketing: 0.78,
-  authentication: 0.30,
+  service: 0.0,
+  utility: 0.115,
+  marketing: 0.8631,
+  authentication: 0.115,
 };
 
 async function seed() {

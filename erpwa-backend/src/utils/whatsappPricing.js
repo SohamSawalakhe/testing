@@ -9,18 +9,18 @@ import prisma from "../prisma.js";
 
 // ─── Default India pricing (INR per conversation) ──────────────
 const DEFAULT_META_PRICING = {
-  service: 0.14,
-  utility: 0.30,
-  marketing: 0.78,
-  authentication: 0.30,
+  service: 0.0,
+  utility: 0.115,
+  marketing: 0.8631,
+  authentication: 0.115,
 };
 
 // ─── Platform markup per category ──────────────────────────────
 const PLATFORM_MARKUP = {
-  service: 0.16,
-  utility: 0.20,
-  marketing: 0.32,
-  authentication: 0.20,
+  service: 0.00,
+  utility: 0.00,
+  marketing: 0.00,
+  authentication: 0.00,
 };
 
 const DEFAULT_COUNTRY = "India";
@@ -37,20 +37,7 @@ export async function getMetaPrice(category, country = DEFAULT_COUNTRY) {
   const normalizedCategory = category?.toLowerCase();
 
   if (!["service", "utility", "marketing", "authentication"].includes(normalizedCategory)) {
-    console.warn(`⚠️ Unknown pricing category: "${category}", defaulting to service`);
     return DEFAULT_META_PRICING.service;
-  }
-
-  try {
-    const pricing = await prisma.whatsappPricing.findUnique({
-      where: { country },
-    });
-
-    if (pricing && pricing[normalizedCategory] !== undefined) {
-      return pricing[normalizedCategory];
-    }
-  } catch (err) {
-    console.error("⚠️ Error fetching pricing from DB, using defaults:", err.message);
   }
 
   return DEFAULT_META_PRICING[normalizedCategory];
@@ -76,10 +63,8 @@ export function getMarkup(category) {
  */
 export async function calculateChargedCost(category, country = DEFAULT_COUNTRY) {
   const metaCost = await getMetaPrice(category, country);
-  const markup = getMarkup(category);
-  const chargedCost = parseFloat((metaCost + markup).toFixed(4));
-
-  return { metaCost, markup, chargedCost };
+  // Force zero markup as per user request
+  return { metaCost, markup: 0, chargedCost: metaCost };
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Edit2,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -67,6 +68,8 @@ export default function ActivatedVendorsPage() {
   const [allVendors, setAllVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [editingVendor, setEditingVendor] = useState<{ id: string; name: string; currentEnd: string | null } | null>(null);
+  const [newSubDate, setNewSubDate] = useState("");
 
   const fetchVendors = useCallback(() => {
     setLoading(true);
@@ -80,6 +83,40 @@ export default function ActivatedVendorsPage() {
   useEffect(() => {
     fetchVendors();
   }, [fetchVendors]);
+
+  const handleEditClick = (v: Vendor) => {
+    setEditingVendor({
+      id: v.id,
+      name: v.name,
+      currentEnd: v.subscriptionEnd || null,
+    });
+    if (v.subscriptionEnd) {
+      const d = new Date(v.subscriptionEnd);
+      const tzOffset = d.getTimezoneOffset() * 60000;
+      const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+      setNewSubDate(localISOTime);
+    } else {
+      setNewSubDate("");
+    }
+  };
+
+  const submitUpdateSubscription = async () => {
+    if (!editingVendor || !newSubDate) return;
+
+    try {
+      const newEndDate = new Date(newSubDate);
+
+      await api.put(`/super-admin/vendors/${editingVendor.id}/subscription`, {
+        subscriptionEnd: newEndDate.toISOString(),
+      });
+      toast.success("Subscription updated successfully");
+      setEditingVendor(null);
+      fetchVendors();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update subscription");
+    }
+  };
 
   // Activated = owner activated via admin OR WhatsApp is already connected (old flow)
   const vendors = allVendors.filter(
@@ -269,17 +306,26 @@ export default function ActivatedVendorsPage() {
 
                       return (
                         <div className="flex flex-col gap-0.5">
-                          <span
-                            className={`inline-flex items-center gap-1 text-xs font-medium ${isExpired
-                                ? "text-destructive"
-                                : isWarning
-                                  ? "text-orange-500"
-                                  : "text-primary"
-                              }`}
-                          >
-                            <Clock className="h-3 w-3" />
-                            {label}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 text-xs font-medium ${isExpired
+                                  ? "text-destructive"
+                                  : isWarning
+                                    ? "text-orange-500"
+                                    : "text-primary"
+                                }`}
+                            >
+                              <Clock className="h-3 w-3" />
+                              {label}
+                            </span>
+                            <button
+                              onClick={() => handleEditClick(v)}
+                              className="text-muted-foreground hover:text-primary transition-colors p-1"
+                              title="Edit Subscription Date"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </button>
+                          </div>
                           <span className="text-[10px] text-muted-foreground">
                             {isUnlimited ? "Unlimited Access" : "15-day Trial"}
                           </span>
@@ -291,6 +337,41 @@ export default function ActivatedVendorsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Edit Subscription Modal */}
+      {editingVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card w-full max-w-md rounded-xl shadow-lg border border-border p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-foreground">Update Subscription</h3>
+            <p className="text-sm text-muted-foreground">
+              Select a new subscription end date for <strong>{editingVendor.name}</strong>.
+            </p>
+            <div>
+              <input
+                type="datetime-local"
+                className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                value={newSubDate}
+                onChange={(e) => setNewSubDate(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <button
+                onClick={() => setEditingVendor(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitUpdateSubscription}
+                disabled={!newSubDate}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition disabled:opacity-50"
+              >
+                Update
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

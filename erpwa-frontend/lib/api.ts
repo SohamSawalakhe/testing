@@ -129,7 +129,11 @@ api.interceptors.response.use(
     }
 
     // Handle 401 (Expired Token) or 403 (Wrong token type for route)
-    if (error.response.status === 401 || error.response.status === 403) {
+    if (
+      (error.response.status === 401 || error.response.status === 403) &&
+      (error.response.data as { code?: string })?.code !==
+        "SUBSCRIPTION_EXPIRED"
+    ) {
       const isRefreshing = isSuperAdminRoute
         ? isRefreshingSA
         : isRefreshingUser;

@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import http from "http";
 import multer from "multer";
 import "./cron/templateStatus.cron.js";
+import "./cron/subscriptionExpiry.cron.js";
 import prisma from "./prisma.js";
 import { processWhatsappQueue } from "./workers/whatsapp.worker.js";
 import authRoutes from "./routes/auth.routes.js";
