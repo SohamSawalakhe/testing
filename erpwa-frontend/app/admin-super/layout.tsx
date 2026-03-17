@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import api, { setSuperAdminAccessToken } from "@/lib/api";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import api, { setSuperAdminAccessToken } from "@/lib/api";
+import api, { setSuperAdminAccessToken, getSuperAdminAccessToken } from "@/lib/api";
 import { SidebarSuperAdmin } from "@/components/sidebar-super-admin";
 import { HeaderSuperAdmin } from "@/components/header-super-admin";
 import { SidebarProvider, useSidebar } from "@/context/sidebar-provider";
@@ -13,14 +10,38 @@ import { SidebarProvider, useSidebar } from "@/context/sidebar-provider";
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
   const router = useRouter();
+  const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    // 🔐 Restore SA session if on SA route
-    if (window.location.pathname.startsWith("/admin-super")) {
-      api.get("/super-admin/me").catch(() => {
-        // Interceptor handles retry/refresh
-      });
-    }
+    let cancelled = false;
+
+    const restoreSASession = async () => {
+      // If we already have a token in memory, just verify it
+      if (getSuperAdminAccessToken()) {
+        try {
+          await api.get("/super-admin/me");
+          if (!cancelled) setSessionReady(true);
+          return;
+        } catch {
+          // Token might be expired, try refresh below
+        }
+      }
+
+      // No token in memory — try refreshing via the saRefreshToken cookie
+      try {
+        const res = await api.post<{ accessToken: string }>("/super-admin/refresh");
+        setSuperAdminAccessToken(res.data.accessToken);
+        if (!cancelled) setSessionReady(true);
+      } catch {
+        // No valid session at all — redirect to login
+        if (!cancelled) {
+          setSuperAdminAccessToken(null);
+          router.replace("/admin-login");
+        }
+      }
+    };
+
+    restoreSASession();
 
     const handleSALogout = () => {
       setSuperAdminAccessToken(null);
@@ -28,8 +49,19 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener("sa:auth:logout", handleSALogout);
-    return () => window.removeEventListener("sa:auth:logout", handleSALogout);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("sa:auth:logout", handleSALogout);
+    };
   }, [router]);
+
+  if (!sessionReady) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background">

@@ -141,10 +141,6 @@ api.interceptors.response.use(
         ? isRefreshingSA
         : isRefreshingUser;
 
-      const isRefreshing = isSuperAdminRoute
-        ? isRefreshingSA
-        : isRefreshingUser;
-
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           const queue = isSuperAdminRoute ? saFailedQueue : userFailedQueue;
