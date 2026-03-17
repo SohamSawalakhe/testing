@@ -712,7 +712,7 @@ model SuperAdminRefreshToken {
 // ============================================================
 model SubscriptionPlan {
   id                 String   @id @default(uuid())
-  name               String   @unique // 'Free', 'Basic', 'Premium', 'Unlimited'
+  name               String   @unique // 'free', 'basic', 'unlimited', 'custom'
   price              Float    @default(0.0)
   currency           String   @default("INR")
   durationDays       Int      @default(30)   // subscription period length
