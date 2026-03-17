@@ -1,4 +1,5 @@
 import * as Auth from "../services/auth/auth.service.js";
+import prisma from "../prisma.js";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -73,8 +74,28 @@ export async function logout(req, res) {
   res.json({ success: true });
 }
 
-export function me(req, res) {
-  res.json({
-    user: req.user,
-  });
+export async function me(req, res) {
+  try {
+    console.log("🔄 FORCE RESTART LOG: /auth/me hit");
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        vendor: {
+          include: {
+            subscriptionPlan: true
+          }
+        }
+      }
+    });
+
+    console.log("💎 [ME_CONTROLLER] Fresh Fetch Plan:", user?.vendor?.subscriptionPlan?.name);
+    console.log("💎 [ME_CONTROLLER] RAW USER DUMP:", JSON.stringify(user, null, 2));
+    
+    res.json({
+      user: user || req.user,
+    });
+  } catch (error) {
+    console.error("Error in me controller:", error);
+    res.json({ user: req.user });
+  }
 }

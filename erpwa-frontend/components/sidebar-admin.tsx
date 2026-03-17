@@ -23,6 +23,7 @@ import {
   Layers,
   Lock,
   BarChart3,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/sidebar-provider";
@@ -94,7 +95,7 @@ export function SidebarAdmin() {
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname.startsWith(item.href);
-          
+
         const isBlocked =
           (isSetupIncomplete || isExpired) &&
           blockedPaths.some((p) => item.href.startsWith(p));
@@ -113,8 +114,8 @@ export function SidebarAdmin() {
               <div
                 onClick={() =>
                   toast.error(
-                    isExpired 
-                      ? "Your subscription has expired. Please upgrade to use this feature." 
+                    isExpired
+                      ? "Your subscription has expired. Please upgrade to use this feature."
                       : "To use this feature, please complete the setup first.",
                     { autoClose: 3000, theme: "colored" },
                   )
@@ -174,7 +175,9 @@ export function SidebarAdmin() {
             <Lock className="w-3.5 h-3.5" />
           </div>
           <p className="text-xs leading-none m-0 shadow-sm">
-            {isExpired ? "Subscription expired. Please upgrade." : "Setup required for this feature"}
+            {isExpired
+              ? "Subscription expired. Please upgrade."
+              : "Setup required for this feature"}
           </p>
         </div>
       )}

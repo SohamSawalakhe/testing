@@ -38,11 +38,6 @@ async function main() {
       name: "GPSERP Support",
       role: "vendor_owner",
     },
-    // {
-    //   email: "developer.sitarahub@gmail.com",
-    //   name: "Developers",
-    //   role: "sales",
-    // },
   ];
 
   for (const user of users) {
@@ -52,8 +47,8 @@ async function main() {
         name: user.name,
         role: user.role,
         passwordHash,
-        vendorId: vendor.id, // 🔑 THIS IS THE FIX
-        onboardingStatus: "activated", // 🔑 Directly mark as activated
+        vendorId: vendor.id,
+        onboardingStatus: "activated",
       },
     });
 

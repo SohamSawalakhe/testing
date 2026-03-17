@@ -80,6 +80,14 @@ export default function GalleryPage() {
   useEffect(() => {
     loadCategories()
     fetchGalleryLimits()
+
+    const handlePlanUpdate = () => {
+      fetchGalleryLimits();
+    };
+    window.addEventListener("vendor:plan_updated", handlePlanUpdate);
+    return () => {
+      window.removeEventListener("vendor:plan_updated", handlePlanUpdate);
+    };
   }, [])
 
   useEffect(() => {

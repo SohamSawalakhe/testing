@@ -14,7 +14,9 @@ import {
   XCircle,
   Clock,
   Edit2,
+  CreditCard,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "react-toastify";
 
 type Owner = {
@@ -35,6 +37,7 @@ type Vendor = {
   subscriptionEnd?: string | null;
   userCount: number;
   owner: Owner | null;
+  subscriptionPlan?: { id: string; name: string } | null;
 };
 
 function getSubscriptionStatus(endDate?: string | null) {
@@ -50,7 +53,12 @@ function getSubscriptionStatus(endDate?: string | null) {
   const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
   if (days > 3650) {
-    return { label: "Unlimited", isExpired: false, isWarning: false, isUnlimited: true };
+    return {
+      label: "Unlimited",
+      isExpired: false,
+      isWarning: false,
+      isUnlimited: true,
+    };
   }
 
   const hours = Math.floor(
@@ -68,8 +76,21 @@ export default function ActivatedVendorsPage() {
   const [allVendors, setAllVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [editingVendor, setEditingVendor] = useState<{ id: string; name: string; currentEnd: string | null } | null>(null);
+  const [editingVendor, setEditingVendor] = useState<{
+    id: string;
+    name: string;
+    currentEnd: string | null;
+  } | null>(null);
   const [newSubDate, setNewSubDate] = useState("");
+  const [plans, setPlans] = useState<{ id: string; name: string }[]>([]);
+  const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get("/super-admin/subscription-plans")
+      .then((res) => setPlans(res.data))
+      .catch((err) => console.error("Failed to load plans", err));
+  }, []);
 
   const fetchVendors = useCallback(() => {
     setLoading(true);
@@ -93,7 +114,9 @@ export default function ActivatedVendorsPage() {
     if (v.subscriptionEnd) {
       const d = new Date(v.subscriptionEnd);
       const tzOffset = d.getTimezoneOffset() * 60000;
-      const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+      const localISOTime = new Date(d.getTime() - tzOffset)
+        .toISOString()
+        .slice(0, 16);
       setNewSubDate(localISOTime);
     } else {
       setNewSubDate("");
@@ -210,6 +233,9 @@ export default function ActivatedVendorsPage() {
                 <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Subscription
                 </th>
+                <th className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -271,10 +297,11 @@ export default function ActivatedVendorsPage() {
                   </td>
                   <td className="px-5 py-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${v.whatsappStatus === "connected"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                        v.whatsappStatus === "connected"
                           ? "bg-green-500/10 text-green-500"
                           : "bg-muted text-muted-foreground"
-                        }`}
+                      }`}
                     >
                       {v.whatsappStatus === "connected" ? (
                         <CheckCircle className="h-3 w-3" />
@@ -302,18 +329,20 @@ export default function ActivatedVendorsPage() {
                         );
                       }
 
-                      const { label, isExpired, isWarning, isUnlimited } = status as any;
+                      const { label, isExpired, isWarning, isUnlimited } =
+                        status as any;
 
                       return (
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`inline-flex items-center gap-1 text-xs font-medium ${isExpired
+                              className={`inline-flex items-center gap-1 text-xs font-medium ${
+                                isExpired
                                   ? "text-destructive"
                                   : isWarning
                                     ? "text-orange-500"
                                     : "text-primary"
-                                }`}
+                              }`}
                             >
                               <Clock className="h-3 w-3" />
                               {label}
@@ -327,11 +356,60 @@ export default function ActivatedVendorsPage() {
                             </button>
                           </div>
                           <span className="text-[10px] text-muted-foreground">
-                            {isUnlimited ? "Unlimited Access" : "15-day Trial"}
+                            {isUnlimited ? "Unlimited Access" : "Time Limited"}
                           </span>
+
+                          <div className="mt-1 flex items-center gap-2">
+                            {updatingPlan === v.id && (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground mr-1" />
+                            )}
+                            <select
+                              className="text-xs bg-background border border-border rounded px-1.5 py-1 focus:ring-1 focus:ring-primary w-full outline-none"
+                              value={v.subscriptionPlan?.id || ""}
+                              onChange={async (e) => {
+                                const newPlanId = e.target.value;
+                                if (!newPlanId) return;
+                                try {
+                                  setUpdatingPlan(v.id);
+                                  await api.put(
+                                    `/super-admin/vendors/${v.id}/plan`,
+                                    { subscriptionPlanId: newPlanId },
+                                  );
+                                  toast.success("Plan updated successfully");
+                                  fetchVendors();
+                                } catch (err: any) {
+                                  toast.error(
+                                    err.response?.data?.message ||
+                                      "Failed to update plan",
+                                  );
+                                } finally {
+                                  setUpdatingPlan(null);
+                                }
+                              }}
+                              disabled={updatingPlan === v.id}
+                            >
+                              <option value="" disabled>
+                                Select Plan
+                              </option>
+                              {plans.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       );
                     })()}
+                  </td>
+                  <td className="px-5 py-4 text-right">
+                    <Link
+                      href={`/admin-super/transactions?search=${encodeURIComponent(v.name)}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-500 hover:text-blue-600 hover:underline"
+                    >
+                      <CreditCard className="h-3.5 w-3.5" />
+                      Transactions
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -344,9 +422,12 @@ export default function ActivatedVendorsPage() {
       {editingVendor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-card w-full max-w-md rounded-xl shadow-lg border border-border p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Update Subscription</h3>
+            <h3 className="text-lg font-semibold text-foreground">
+              Update Subscription
+            </h3>
             <p className="text-sm text-muted-foreground">
-              Select a new subscription end date for <strong>{editingVendor.name}</strong>.
+              Select a new subscription end date for{" "}
+              <strong>{editingVendor.name}</strong>.
             </p>
             <div>
               <input

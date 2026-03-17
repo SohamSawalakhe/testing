@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api, { setSuperAdminAccessToken } from "@/lib/api";
-import type React from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import api, { setSuperAdminAccessToken } from "@/lib/api";
 import { SidebarSuperAdmin } from "@/components/sidebar-super-admin";
 import { HeaderSuperAdmin } from "@/components/header-super-admin";
 import { SidebarProvider, useSidebar } from "@/context/sidebar-provider";

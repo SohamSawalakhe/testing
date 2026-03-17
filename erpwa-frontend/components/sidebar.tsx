@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Lock,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/sidebar-provider";
@@ -35,6 +36,7 @@ const menuItems = [
   { href: "/users", icon: Users, label: "Team" },
   { href: "/categories", icon: Folder, label: "Categories" },
   { href: "/gallery", icon: ImageIcon, label: "Gallery" },
+  { href: "/pricing", icon: Zap, label: "Pricing" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

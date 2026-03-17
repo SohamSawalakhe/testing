@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api, { setSuperAdminAccessToken } from "@/lib/api";
+import { AxiosError } from "axios";
+import api, { setSuperAdminSuperAdminAccessToken } from "@/lib/api";
 import { ShieldCheck, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
 import { AxiosError } from "axios";
