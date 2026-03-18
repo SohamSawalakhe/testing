@@ -309,12 +309,33 @@ export async function updateVendorPlan(req, res) {
       return res.status(400).json({ message: "Subscription plan ID is required" });
     }
 
-    const plan = await prisma.subscriptionPlan.findUnique({ where: { id: subscriptionPlanId } });
+    // 1. Fetch vendor and target plan
+    const [vendor, plan] = await Promise.all([
+      prisma.vendor.findUnique({
+        where: { id },
+        include: { subscriptionPlan: true },
+      }),
+      prisma.subscriptionPlan.findUnique({ where: { id: subscriptionPlanId } }),
+    ]);
+
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
     if (!plan) return res.status(404).json({ message: "Plan not found" });
 
-    // Set 30 day subscription length based on current date
+    // 2. Enforce: "Once it is free then again it cant go to free"
+    // If the target plan is Free, but the vendor already has/had a plan, block it.
+    if (plan.name === "Free" && vendor.subscriptionPlanId) {
+      return res.status(400).json({
+        message: "Vendor already has an active or previous plan. Re-assigning the Free plan is not allowed.",
+      });
+    }
+
+    // 3. Set subscription length
+    // If plan is Free, timeline is 15 days, otherwise use plan's default (usually 30)
+    const durationDays = plan.name === "Free" ? 15 : (plan.durationDays || 30);
     const subscriptionStart = new Date();
-    const subscriptionEnd = new Date(subscriptionStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const subscriptionEnd = new Date(
+      subscriptionStart.getTime() + durationDays * 24 * 60 * 60 * 1000,
+    );
 
     const updatedVendor = await prisma.vendor.update({
       where: { id },
@@ -324,8 +345,8 @@ export async function updateVendorPlan(req, res) {
         subscriptionEnd,
       },
       include: {
-        subscriptionPlan: true
-      }
+        subscriptionPlan: true,
+      },
     });
 
     try {
@@ -334,12 +355,14 @@ export async function updateVendorPlan(req, res) {
       if (io) {
         io.to(`vendor:${id}`).emit("vendor:plan_updated", {
           plan: plan,
-          subscriptionEnd
+          subscriptionEnd,
         });
       }
-    } catch(e) { console.error("Could not emit socket event", e)}
+    } catch (e) {
+      console.error("Could not emit socket event", e);
+    }
 
-    return res.json({ message: "Vendor plan updated", vendor: updatedVendor });
+    return res.json({ message: `Vendor plan updated to ${plan.name}`, vendor: updatedVendor });
   } catch (err) {
     console.error("updateVendorPlan error:", err);
     return res.status(500).json({ message: "Internal server error" });

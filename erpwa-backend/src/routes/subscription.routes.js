@@ -8,6 +8,23 @@ import { createInvoice } from "../utils/invoice.js";
 const router = express.Router();
 
 // ─────────────────────────────────────────────────────────────
+// GET /api/subscription/public-plans
+// Publicly accessible plans for landing page
+// ─────────────────────────────────────────────────────────────
+router.get("/public-plans", async (req, res) => {
+  try {
+    const plans = await prisma.subscriptionPlan.findMany({
+      where: { isActive: true },
+      orderBy: { price: "asc" },
+    });
+    return res.json(plans);
+  } catch (err) {
+    console.error("subscription/public-plans error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
 // GET /api/subscription/plans
 // All active plans (for pricing page)
 // ─────────────────────────────────────────────────────────────
@@ -385,6 +402,20 @@ router.post("/webhook", async (req, res) => {
           }
         }
       }
+    } else if (eventType === "payment.failed") {
+      const payment = event.payload.payment.entity;
+      const orderId = payment.order_id;
+      const paymentId = payment.id;
+
+      console.log(`❌ [Webhook] Payment failed for order ${orderId}`);
+
+      await prisma.vendorPayment.updateMany({
+        where: { razorpayOrderId: orderId },
+        data: {
+          razorpayPaymentId: paymentId,
+          status: "failed",
+        },
+      });
     }
 
     return res.json({ received: true });

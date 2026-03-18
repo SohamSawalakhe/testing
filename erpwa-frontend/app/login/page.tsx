@@ -154,9 +154,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Footer */}
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} GPS erp
+          © 2026 GPS erp
         </p>
         <div className="flex justify-center gap-4 mt-2 text-xs text-muted-foreground/80">
           <a
