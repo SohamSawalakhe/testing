@@ -4,7 +4,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 
-/* ================= ACCESS TOKENS (IN MEMORY) ================= */
+/* ================= ACCESS TOKENSS (IN MEMORY) ================= */
 
 let userAccessToken: string | null = null;
 let superAdminAccessToken: string | null = null;
@@ -129,8 +129,17 @@ api.interceptors.response.use(
     }
 
     // Handle 401 (Expired Token) or 403 (Wrong token type for route)
-    if (error.response.status === 401 || error.response.status === 403) {
-      const isRefreshing = isSuperAdminRoute ? isRefreshingSA : isRefreshingUser;
+    // Handle 401 (Expired Token) or 403 (Wrong token type for route)
+    if (
+      (error.response.status === 401 ||
+        error.response.status === 403 ||
+        error.response.status === 403) &&
+      (error.response.data as { code?: string })?.code !==
+        "SUBSCRIPTION_EXPIRED"
+    ) {
+      const isRefreshing = isSuperAdminRoute
+        ? isRefreshingSA
+        : isRefreshingUser;
 
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

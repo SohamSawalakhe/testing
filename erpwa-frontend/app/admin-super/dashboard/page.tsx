@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 type Stats = { vendors: number; users: number; leads: number; totalRevenue: number };
 
 export default function SuperAdminDashboard() {
-  const [stats, setStats] = useState<Stats>({ vendors: 0, users: 0, leads: 0 });
+  const [stats, setStats] = useState<Stats>({ vendors: 0, users: 0, leads: 0, totalRevenue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

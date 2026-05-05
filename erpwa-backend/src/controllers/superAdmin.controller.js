@@ -297,6 +297,39 @@ export async function activateVendor(req, res) {
 }
 
 /* ============================================================
+ * PUT /api/super-admin/vendors/:id/subscription
+ * Updates a vendor's subscription end date
+ * ============================================================ */
+export async function updateVendorSubscription(req, res) {
+  try {
+    const { id } = req.params;
+    const { subscriptionEnd } = req.body;
+
+    if (!subscriptionEnd) {
+      return res.status(400).json({ message: "subscriptionEnd is required" });
+    }
+
+    const newEndDate = new Date(subscriptionEnd);
+    const updateData = { subscriptionEnd: newEndDate };
+    
+    // If the new end date is in the future, reset the expiration mail flag
+    if (newEndDate > new Date()) {
+      updateData.subscriptionExpiredMailSent = false;
+    }
+
+    const updatedVendor = await prisma.vendor.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return res.json({ message: "Vendor subscription updated successfully", vendor: updatedVendor });
+  } catch (err) {
+    console.error("updateVendorSubscription error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
  * PUT /api/super-admin/vendors/:id/plan
  * Updates a vendor's subscription plan (Super Admin action)
  * ============================================================ */
