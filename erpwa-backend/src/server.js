@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import http from "http";
 import multer from "multer";
 import "./cron/templateStatus.cron.js";
+import "./cron/subscriptionExpiry.cron.js";
 import prisma from "./prisma.js";
 import { processWhatsappQueue } from "./workers/whatsapp.worker.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -35,6 +36,7 @@ import WhatsappNumberCheckRoute from "./routes/whatsappNumberCheck.route.js";
 import activityLogsRoutes from "./routes/activityLogs.route.js";
 import whatsappFlowsRoutes from "./routes/whatsappFlows.route.js";
 import superAdminRoutes from "./routes/superAdmin.routes.js";
+import whatsappAnalyticsRoutes from "./routes/analytics.route.js";
 import subscriptionRoutes from "./routes/subscription.routes.js";
 import contactRoutes from "./routes/contact.routes.js";
 
@@ -87,6 +89,7 @@ app.use("/test", testUploadRoute);
 app.use("/api/whatsapp", WhatsappNumberCheckRoute);
 app.use("/api/whatsapp/flows", whatsappFlowsRoutes);
 app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/analytics/whatsapp", whatsappAnalyticsRoutes);
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/contact", contactRoutes);
 
