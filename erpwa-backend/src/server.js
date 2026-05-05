@@ -38,6 +38,8 @@ import whatsappFlowsRoutes from "./routes/whatsappFlows.route.js";
 import superAdminRoutes from "./routes/superAdmin.routes.js";
 import whatsappAnalyticsRoutes from "./routes/analytics.route.js";
 import subscriptionRoutes from "./routes/subscription.routes.js";
+import contactRoutes from "./routes/contact.routes.js";
+
 
 const app = express();
 app.set("trust proxy", 1);
@@ -89,6 +91,8 @@ app.use("/api/whatsapp/flows", whatsappFlowsRoutes);
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/analytics/whatsapp", whatsappAnalyticsRoutes);
 app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/contact", contactRoutes);
+
 
 
 /* ================= ERROR HANDLING ================= */
