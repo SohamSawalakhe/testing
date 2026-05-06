@@ -45,7 +45,6 @@ const menuItems = [
   { href: "/admin/manage-team", icon: Users, label: "Manage Team" },
   { href: "/admin/setup", icon: Plug, label: "Setup" },
   { href: "/admin/activity-logs", icon: Activity, label: "Activity Logs" },
-  { href: "/admin/insights", icon: BarChart3, label: "Insights" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 

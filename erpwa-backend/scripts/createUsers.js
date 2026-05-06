@@ -23,21 +23,21 @@ async function main() {
     //   name: "Soham Sawalakhe",
     //   role: "vendor_admin",
     // },
-    // {
-    //   email: "gauravrai3133@gmail.com",
-    //   name: "Gaurav Rai",
-    //   role: "vendor_owner",
-    // },
     {
-      email: "pradhanpratik219@gmail.com",
-      name: "Pratik Pradhan",
-      role: "vendor_admin",
-    },
-    {
-      email: "support@gpserp.com",
-      name: "GPSERP Support",
+      email: "gauravrai3133@gmail.com",
+      name: "Gaurav Rai",
       role: "vendor_owner",
     },
+    // {
+    //   email: "pradhanpratik219@gmail.com",
+    //   name: "Pratik Pradhan",
+    //   role: "vendor_admin",
+    // },
+    // {
+    //   email: "support@gpserp.com",
+    //   name: "GPSERP Support",
+    //   role: "vendor_owner",
+    // },
   ];
 
   for (const user of users) {
