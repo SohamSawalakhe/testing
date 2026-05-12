@@ -6,7 +6,6 @@ import { AxiosError } from "axios";
 import api, { setSuperAdminAccessToken } from "@/lib/api";
 import { ShieldCheck, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
-
 export default function SuperAdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +17,9 @@ export default function SuperAdminLoginPage() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        await api.get("/super-admin/me");
+        // Try to refresh via cookie first, then verify
+        const refreshRes = await api.post<{ accessToken: string }>("/super-admin/refresh");
+        setSuperAdminAccessToken(refreshRes.data.accessToken);
         router.push("/admin-super/dashboard");
       } catch {
         setInitialLoading(false);
@@ -37,7 +38,9 @@ export default function SuperAdminLoginPage() {
       router.push("/admin-super/dashboard");
     } catch (err: unknown) {
       const message =
-        err instanceof AxiosError ? err.response?.data?.message : "Login failed";
+        err instanceof AxiosError
+          ? err.response?.data?.message
+          : "Login failed";
       toast.error(message || "Login failed");
     } finally {
       setLoading(false);

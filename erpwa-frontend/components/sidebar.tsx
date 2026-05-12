@@ -45,6 +45,9 @@ export function Sidebar() {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const { logout, user } = useAuth();
   const isSetupIncomplete = user?.vendor?.whatsappStatus !== "connected";
+  const isExpired =
+    user?.vendor?.subscriptionEnd &&
+    new Date(user.vendor.subscriptionEnd).getTime() <= new Date().getTime();
 
   const blockedPaths = [
     "/inbox",
@@ -82,7 +85,7 @@ export function Sidebar() {
         const Icon = item.icon;
         const isActive = pathname.startsWith(item.href);
         const isBlocked =
-          isSetupIncomplete &&
+          (isSetupIncomplete || isExpired) &&
           blockedPaths.some((p) => item.href.startsWith(p));
 
         // 🛡️ Wrapper div for handling the tooltip and cursor correctly when blocked
@@ -99,7 +102,9 @@ export function Sidebar() {
               <div
                 onClick={() =>
                   toast.error(
-                    "To use this feature, please complete the setup first.",
+                    isExpired
+                      ? "The organization's subscription has expired."
+                      : "To use this feature, please complete the setup first.",
                     { autoClose: 3000, theme: "colored" },
                   )
                 }
@@ -158,7 +163,7 @@ export function Sidebar() {
             <Lock className="w-3.5 h-3.5" />
           </div>
           <p className="text-xs leading-none m-0 shadow-sm">
-            Setup required for this feature
+            {isExpired ? "Subscription expired" : "Setup required for this feature"}
           </p>
         </div>
       )}

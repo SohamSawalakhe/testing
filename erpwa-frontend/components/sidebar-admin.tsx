@@ -22,6 +22,7 @@ import {
   Activity,
   Layers,
   Lock,
+  BarChart3,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -47,12 +48,15 @@ const menuItems = [
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
-
 export function SidebarAdmin() {
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
   const { logout, user } = useAuth();
   const isSetupIncomplete = user?.vendor?.whatsappStatus !== "connected";
+
+  const isExpired =
+    user?.vendor?.subscriptionEnd &&
+    new Date(user.vendor.subscriptionEnd).getTime() <= new Date().getTime();
 
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -63,6 +67,7 @@ export function SidebarAdmin() {
     "/admin/templates",
     "/admin/flows",
     "/admin/campaigns",
+    "/admin/leads",
     "/admin/activity-logs",
   ];
 
@@ -89,8 +94,9 @@ export function SidebarAdmin() {
       {menuItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname.startsWith(item.href);
+
         const isBlocked =
-          isSetupIncomplete &&
+          (isSetupIncomplete || isExpired) &&
           blockedPaths.some((p) => item.href.startsWith(p));
 
         // 🛡️ Wrapper div for handling the tooltip and cursor correctly when blocked
@@ -107,7 +113,9 @@ export function SidebarAdmin() {
               <div
                 onClick={() =>
                   toast.error(
-                    "To use this feature, please complete the setup first.",
+                    isExpired
+                      ? "Your subscription has expired. Please upgrade to use this feature."
+                      : "To use this feature, please complete the setup first.",
                     { autoClose: 3000, theme: "colored" },
                   )
                 }
@@ -166,7 +174,9 @@ export function SidebarAdmin() {
             <Lock className="w-3.5 h-3.5" />
           </div>
           <p className="text-xs leading-none m-0 shadow-sm">
-            Setup required for this feature
+            {isExpired
+              ? "Subscription expired. Please upgrade."
+              : "Setup required for this feature"}
           </p>
         </div>
       )}

@@ -17,6 +17,7 @@ import {
   updateSubscriptionPlan,
   deleteSubscriptionPlan,
   initSubscriptionPlans,
+  updateVendorSubscription,
   updateVendorPlan,
   getPayments,
   getInvoice,
@@ -35,6 +36,7 @@ router.get("/me", superAdminAuth, superAdminMe);
 router.get("/vendors", superAdminAuth, getVendors);
 router.get("/vendors/:id/registration", superAdminAuth, getVendorRegistration);
 router.put("/vendors/:id/activate", superAdminAuth, activateVendor);
+router.put("/vendors/:id/subscription", superAdminAuth, updateVendorSubscription);
 router.put("/vendors/:id/plan", superAdminAuth, updateVendorPlan);
 router.get("/stats", superAdminAuth, getStats);
 router.get("/payments", superAdminAuth, getPayments);

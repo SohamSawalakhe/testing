@@ -520,7 +520,9 @@ CREATE TABLE "SubscriptionPlan" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "price" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "currency" TEXT NOT NULL DEFAULT 'INR',
+    "durationDays" INTEGER NOT NULL DEFAULT 30,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
     "conversationLimit" INTEGER NOT NULL DEFAULT 100,
     "galleryLimit" INTEGER NOT NULL DEFAULT 50,
     "chatbotLimit" INTEGER NOT NULL DEFAULT 1,
@@ -531,6 +533,50 @@ CREATE TABLE "SubscriptionPlan" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "SubscriptionPlan_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VendorSubscription" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "planId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "startDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "razorpayOrderId" TEXT,
+    "razorpayPaymentId" TEXT,
+    "autoRenew" BOOLEAN NOT NULL DEFAULT false,
+    "renewedFromId" TEXT,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VendorSubscription_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VendorPayment" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "subscriptionId" TEXT,
+    "amount" DOUBLE PRECISION NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'INR',
+    "gateway" TEXT NOT NULL DEFAULT 'razorpay',
+    "razorpayOrderId" TEXT,
+    "razorpayPaymentId" TEXT,
+    "razorpaySignature" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "invoiceNumber" TEXT,
+    "invoiceDate" TIMESTAMP(3),
+    "billingName" TEXT,
+    "billingEmail" TEXT,
+    "planName" TEXT,
+    "planDuration" INTEGER,
+    "taxAmount" DOUBLE PRECISION DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VendorPayment_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -722,6 +768,33 @@ CREATE UNIQUE INDEX "SuperAdminRefreshToken_tokenHash_key" ON "SuperAdminRefresh
 -- CreateIndex
 CREATE UNIQUE INDEX "SubscriptionPlan_name_key" ON "SubscriptionPlan"("name");
 
+-- CreateIndex
+CREATE INDEX "VendorSubscription_vendorId_idx" ON "VendorSubscription"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "VendorSubscription_status_idx" ON "VendorSubscription"("status");
+
+-- CreateIndex
+CREATE INDEX "VendorSubscription_endDate_idx" ON "VendorSubscription"("endDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorPayment_razorpayOrderId_key" ON "VendorPayment"("razorpayOrderId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorPayment_razorpayPaymentId_key" ON "VendorPayment"("razorpayPaymentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorPayment_invoiceNumber_key" ON "VendorPayment"("invoiceNumber");
+
+-- CreateIndex
+CREATE INDEX "VendorPayment_vendorId_idx" ON "VendorPayment"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "VendorPayment_status_idx" ON "VendorPayment"("status");
+
+-- CreateIndex
+CREATE INDEX "VendorPayment_invoiceNumber_idx" ON "VendorPayment"("invoiceNumber");
+
 -- AddForeignKey
 ALTER TABLE "Vendor" ADD CONSTRAINT "Vendor_subscriptionPlanId_fkey" FOREIGN KEY ("subscriptionPlanId") REFERENCES "SubscriptionPlan"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -856,3 +929,15 @@ ALTER TABLE "FlowResponse" ADD CONSTRAINT "FlowResponse_conversationId_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "SuperAdminRefreshToken" ADD CONSTRAINT "SuperAdminRefreshToken_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "SuperAdmin"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorSubscription" ADD CONSTRAINT "VendorSubscription_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorSubscription" ADD CONSTRAINT "VendorSubscription_planId_fkey" FOREIGN KEY ("planId") REFERENCES "SubscriptionPlan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorPayment" ADD CONSTRAINT "VendorPayment_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorPayment" ADD CONSTRAINT "VendorPayment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "VendorSubscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;
